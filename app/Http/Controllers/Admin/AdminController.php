@@ -1087,8 +1087,8 @@ class AdminController extends Controller
                 $application_setting_update = $roles[0]->application_setting_update;
 
 
-                //$general_setting_view = $roles[0]->general_setting_view;
-                //$general_setting_update = $roles[0]->general_setting_update;
+                $general_setting_view = $roles[0]->general_setting_view;
+                $general_setting_update = $roles[0]->general_setting_update;
 
                 $manage_admins_view   = $roles[0]->manage_admins_view;
                 $manage_admins_create = $roles[0]->manage_admins_create;

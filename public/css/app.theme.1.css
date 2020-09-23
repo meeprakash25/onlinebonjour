@@ -1135,7 +1135,7 @@ body[dir="ltr"] .breadcum-area {
 }
 
 .header-area .header-maxi .top-right-list .cart-header .shopping-cart .shopping-cart-items li .item-thumb .icon:hover {
-  background-color: #c61017;
+  background-color: #ec2f59;
 }
 
 .header-area .header-maxi .top-right-list .cart-header .shopping-cart .shopping-cart-items li .item-thumb .icon .fa {
@@ -1245,7 +1245,7 @@ body[dir="ltr"] .breadcum-area {
 }
 
 .header-area .header-navi .navbar .navbar-nav .dropdown-main a[aria-expanded="true"] {
-  background-color: #c61017;
+  background-color: #ec2f59;
   color: #fff;
 }
 
@@ -1289,7 +1289,7 @@ body[dir="ltr"] .breadcum-area {
 
 .header-area .header-navi .navbar .navbar-nav .dropdown-main .nav-link:hover,
 .header-area .header-navi .navbar .navbar-nav .dropdown-main .nav-link:focus {
-  background-color: #c61017;
+  background-color: #ef343b;
   color: #fff;
 }
 
@@ -1550,7 +1550,7 @@ body[dir="ltr"] .breadcum-area {
   min-height: 20px;
   max-height: 30px;
   text-decoration: none;
- 
+
 }
 
 .mega-dropdown .mega-dropdown-menu .carousel .carousel-item .block {
@@ -7209,7 +7209,7 @@ fieldset:disabled a.btn {
 .btn-secondary:hover {
   color: #fff;
   background-color: #d21118;
-  border-color: #c61017;
+  border-color: #ec2f59;
 }
 
 .btn-secondary:focus,
@@ -7229,7 +7229,7 @@ fieldset:disabled a.btn {
 .btn-secondary:not(:disabled):not(.disabled).active,
 .show > .btn-secondary.dropdown-toggle {
   color: #fff;
-  background-color: #c61017;
+  background-color: #ec2f59;
   border-color: #ba0f15;
 }
 
@@ -10004,7 +10004,7 @@ a.badge-primary.focus {
 a.badge-secondary:hover,
 a.badge-secondary:focus {
   color: #fff;
-  background-color: #c61017;
+  background-color: #ec2f59;
 }
 
 a.badge-secondary:focus,
@@ -11688,7 +11688,7 @@ a.bg-secondary:hover,
 a.bg-secondary:focus,
 button.bg-secondary:hover,
 button.bg-secondary:focus {
-  background-color: #c61017 !important;
+  background-color: #ec2f59 !important;
 }
 
 .bg-success {
