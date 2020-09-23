@@ -71,7 +71,6 @@
                         <div class="row">
                             <!-- Items -->
                             <div class="products products-5x">
-                            {{--{{dd($result)}}--}}
                             <!-- categories -->
                                 <?php $counter = 0;?>
                                 @foreach($result['manufacturers'] as $manufacturer)
@@ -86,10 +85,6 @@
                                                             <img class="img-fluid"
                                                                  src="{{asset('').$manufacturer->manufacturers_image}}"
                                                                  alt="{{$manufacturer->manufacturers_name}}">
-                                                        </a>
-                                                        <a href="{{ URL::to('/shop?manufacturer='.$manufacturer->manufacturers_slug)}}"
-                                                           class="cat-title">
-                                                            {{$manufacturer->manufacturers_name}}
                                                         </a>
                                                     </div>
                                                 </article>

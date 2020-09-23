@@ -71,7 +71,6 @@
                                 <!-- Items -->
                                 <div class="products products-5x">
                                     <!-- categories -->
-                                    {{--                                    {{dd($manufacturers)}}--}}
                                     @if($manufacturers != null)
                                         <div class="product">
                                             <div class="blog-post">
@@ -82,10 +81,6 @@
                                                             <img class="img-fluid"
                                                                  src="{{asset('').$manufacturers->manufacturers_image}}"
                                                                  alt="{{$manufacturers->manufacturers_name}}">
-                                                        </a>
-                                                        <a href="{{ URL::to('/shop?manufacturer='.$manufacturers->manufacturers_slug)}}"
-                                                           class="cat-title">
-                                                            {{$manufacturers->manufacturers_name}}
                                                         </a>
                                                     </div>
                                                 </article>
