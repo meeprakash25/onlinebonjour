@@ -6,3522 +6,3095 @@ Author: VectorCoder Team
 Author URI: http://vectorcoder.com/
 
 */
-namespace App\Http\Controllers\Admin;
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\App\CategoriesController;
 
-use Validator;
+namespace App\Http\Controllers\Admin;
+
 use App;
-use Lang;
-use DB;
-//for password encryption or hash protected
-use Hash;
 use App\Administrator;
+use App\Http\Controllers\App\CategoriesController;
+use App\Http\Controllers\Controller;
+use Auth;
+use DB;
+use Hash;
+use Illuminate\Http\Request;
+use Lang;
+use Validator;
+
+//for password encryption or hash protected
 
 //for authenitcate login data
-use Auth;
 
-//for requesting a value 
-use Illuminate\Http\Request;
+//for requesting a value
 class AdminProductsController extends Controller
 {
-	
-	//deleteProduct
-	public function deleteproduct(Request $request){
-		if(session('products_delete')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{
-			
-		$products_id = $request->products_id;
-		
-		$categories = DB::table('products_to_categories')->where('products_id',$products_id)->delete();
-		$categories = DB::table('products')->where('products_id',$products_id)->delete();
-		$categories = DB::table('specials')->where('products_id',$products_id)->delete();
-		$categories = DB::table('products_description')->where('products_id',$products_id)->delete();
-		$categories = DB::table('products_attributes')->where('products_id',$products_id)->delete();
-		$categories = DB::table('inventory')->where('products_id',$products_id)->delete();
-		$categories = DB::table('inventory_detail')->where('products_id',$products_id)->delete();
-		$categories = DB::table('flash_sale')->where('products_id',$products_id)->delete();
-		$categories = DB::table('products_images')->where('products_id',$products_id)->delete();			
-		
-		return redirect()->back()->withErrors([Lang::get("labels.ProducthasbeendeletedMessage")]);
-		}
-	}
-	
-	//get product
-	public function getProducts($products_id){
-		
-		$language_id     =   1;		
-		
-		$product = DB::table('products')
-			->leftJoin('products_description','products_description.products_id','=','products.products_id')
-			->leftJoin('manufacturers','manufacturers.manufacturers_id','=','products.manufacturers_id')
-			->leftJoin('manufacturers_info','manufacturers.manufacturers_id','=','manufacturers_info.manufacturers_id')
-			->LeftJoin('specials', function ($join) {
-				$join->on('specials.products_id', '=', 'products.products_id')->where('status', '=', '1');
-			 })
-			->select('products.*','products_description.*','manufacturers.*','manufacturers_info.manufacturers_url', 'specials.specials_id', 'specials.products_id as special_products_id', 'specials.specials_new_products_price as specials_products_price', 'specials.specials_date_added as specials_date_added', 'specials.specials_last_modified as specials_last_modified', 'specials.expires_date')
-			->where('products_description.language_id','=', $language_id);
-			
-			if($products_id!=null){
-				$product->where('products.products_id','=', $products_id);
-			}else{
-				$product->orderBy('products.products_id', 'DESC');
-			}
-			
-		$products = $product->get();
-		return($products);
-	}
-	
-	public function products(Request $request){
-		if(session('products_view')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{
-		$title = array('pageTitle' => Lang::get("labels.Products"));
-		$language_id            				=   '1';			
-		$results								= array();		
-		
-		//get function from other controller
-		$myVar = new AdminCategoriesController();
-		$subCategories = $myVar->getSubCategories($language_id);		
-		
-		$data = DB::table('products')
-			->leftJoin('products_description','products_description.products_id','=','products.products_id')
-			->LeftJoin('manufacturers', function ($join) {
-				$join->on('manufacturers.manufacturers_id', '=', 'products.manufacturers_id');
-			 })
-			->LeftJoin('specials', function ($join) {
-				$join->on('specials.products_id', '=', 'products.products_id')->where('status', '=', '1');
-			 });
-			 			 
-			if(isset($_REQUEST['categories_id']) and !empty($_REQUEST['categories_id']) or !empty(session('categories_id'))){
-			$data->leftJoin('products_to_categories', 'products.products_id', '=', 'products_to_categories.products_id')
-				 ->leftJoin('categories', 'categories.categories_id', '=', 'products_to_categories.categories_id');
-			}
-			 
-			$data->select('products.*','products_description.*', 'specials.specials_id', 'manufacturers.*', 'specials.products_id as special_products_id', 'specials.specials_new_products_price as specials_products_price', 'specials.specials_date_added as specials_date_added', 'specials.specials_last_modified as specials_last_modified', 'specials.expires_date')
-			->where('products_description.language_id','=', $language_id);
-			
-			if(isset($_REQUEST['categories_id']) and !empty($_REQUEST['categories_id'])){
-				
-				if(!empty(session('categories_id'))){
-					$cat_array = explode(',', session('categories_id'));
-					$data->whereIn('products_to_categories.categories_id','=', $cat_array);	
-				}
-				
-				$data->where('products_to_categories.categories_id','=', $_REQUEST['categories_id']);	
-				
-			}else{
-				if(!empty(session('categories_id'))){
-					$cat_array = explode(',', session('categories_id'));
-					$data->whereIn('products_to_categories.categories_id', $cat_array);	
-				}
-			}
-			
-			if(isset($_REQUEST['product']) and !empty($_REQUEST['product'])){
-				$data->where('products_name', 'like', '%' . $_REQUEST['product'] . '%');
-			}
-				
-			$products = $data->orderBy('products.products_id', 'DESC')->paginate(40);
-			
-		
-		$results['subCategories'] = $subCategories;
-		$results['products'] = $products;
-		
-		//get function from other controller
-		$myVar = new AdminSiteSettingController();
-		$results['currency'] = $myVar->getSetting();
-		$results['units'] = $myVar->getUnits();
-		
-		$currentTime =  array('currentTime'=>time());
-		return view("admin.products",$title)->with('results', $results);
-		}
-	}
-	
-	public function addproduct(Request $request){
-		if(session('products_create')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{
-		$title = array('pageTitle' => Lang::get("labels.AddProduct"));
-		$language_id      =   '1';
-		
-		$result = array();
-		
-		//get function from other controller
-		$myVar = new AdminCategoriesController();
-		$result['categories'] = $myVar->allCategories($language_id);
-		
-		//get function from other controller
-		$myVar = new AdminManufacturerController();
-		$result['manufacturer'] = $myVar->getManufacturer($language_id);
-		
-		//tax class
-		$taxClass = DB::table('tax_class')->get();
-		$result['taxClass'] = $taxClass;
-		
-		//get function from other controller
-		$myVar = new AdminSiteSettingController();
-		$result['languages'] = $myVar->getLanguages();		
-		$result['units'] = $myVar->getUnits();
-		
-		return view("admin.addproduct", $title)->with('result', $result);
-		}
-	}
-	
-	//addNewProduct
-	public function addnewproduct(Request $request){
-	   // dd($request->all());
-		if(session('products_create')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{
-		$title = array('pageTitle' => Lang::get("labels.AddAttributes"));
-		$language_id      =   '1';		
-		$date_added	= date('Y-m-d h:i:s');
-		
-		//get function from other controller
-		$myVar = new AdminSiteSettingController();
-		$languages = $myVar->getLanguages();		
-		$extensions = $myVar->imageType();
-		
-		$expiryDate = str_replace('/', '-', $request->expires_date);
-		$expiryDateFormate = strtotime($expiryDate);
-		
-		if($request->hasFile('products_image') and in_array($request->products_image->extension(), $extensions)){
-			$image = $request->products_image;
-			$fileName = time().'.'.$image->getClientOriginalName();
-			$image->move('resources/assets/images/product_images/', $fileName);
-			$uploadImage = 'resources/assets/images/product_images/'.$fileName; 
-		}else{
-			$uploadImage = '';
-		}	
-		
-		$products_id = DB::table('products')->insertGetId([
-					'products_image'  		 =>   $uploadImage,
-					'manufacturers_id'		 =>   $request->manufacturers_id,
-					'products_quantity'		 =>   0,
-					'products_model'		 =>   $request->products_model,
-					'products_price'		 =>   $request->products_price,
-					'discount_price'		 =>   $request->discount_price,
-					'products_date_added'	 =>   $date_added,
-					'products_weight'		 =>   $request->products_weight,
-					'products_status'		 =>   $request->products_status,
-					'products_tax_class_id'  =>   $request->tax_class_id,
-					'products_weight_unit'	 =>	  $request->products_weight_unit,
-					'low_limit'				 =>   0,
-					'products_type'			 =>	  $request->products_type,
-					'is_feature'			 =>	  1,
-					'products_min_order'	 =>	  $request->products_min_order,
-					'products_max_stock'	 =>	  $request->products_max_stock
-					]);
-					
-		$slug_flag = false;
-		foreach($languages as $languages_data){
-			$products_name = 'products_name_'.$languages_data->languages_id;
-			$products_url = 'products_url_'.$languages_data->languages_id;
-			$products_description = 'products_description_'.$languages_data->languages_id;
-			
-			//left banner
-			$products_left_banner = 'products_left_banner_'.$languages_data->languages_id;	
-					
-			$products_left_banner_start_date = 'products_left_banner_start_date_'.$languages_data->languages_id;		
-			if(!empty($request->$products_left_banner_start_date)){	
-			
-				$leftStartDate = str_replace('/', '-', $request->$products_left_banner_start_date);
-				$leftStartDateFormat = strtotime($leftStartDate);
-			
-			}else{
-				$leftStartDateFormat = '';
-			}
-			
-			//expire date		
-			$products_left_banner_expire_date = 'products_left_banner_expire_date_'.$languages_data->languages_id;		
-			if(!empty($request->$products_left_banner_expire_date)){		
-				$leftExpiretDate = str_replace('/', '-', $request->$products_left_banner_expire_date);
-				$leftExpireDateFormat = strtotime($leftExpiretDate);
-			}else{
-				$leftExpireDateFormat = '';
-			}
-			
-			//right banner
-			$products_right_banner = 'products_right_banner_'.$languages_data->languages_id;				
-					
-			$products_right_banner_start_date = 'products_right_banner_start_date_'.$languages_data->languages_id;	
-			if(!empty($request->$products_right_banner_start_date)){		
-				$rightStartDate = str_replace('/', '-', $request->$products_right_banner_start_date);
-				$rightStartDateFormat = strtotime($rightStartDate);
-			}else{
-				$rightStartDateFormat = '';
-			}
-			
-			//expire date		
-			$products_right_banner_expire_date = 'products_right_banner_expire_date_'.$languages_data->languages_id;
-			if(!empty($request->$products_right_banner_expire_date)){			
-				$rightExpiretDate = str_replace('/', '-', $request->$products_right_banner_expire_date);
-				$rightExpireDateFormat = strtotime($rightExpiretDate);
-			}else{
-				$rightExpireDateFormat = '';			
-			}
-			
-			//slug
-			if($slug_flag==false){
-				$slug_flag=true;
-				
-				$slug = $request->$products_name;
-				$old_slug = $request->$products_name;
-				
-				$slug_count = 0;
-				do{
-					if($slug_count==0){
-						$currentSlug = $myVar->slugify($slug);
-					}else{
-						$currentSlug = $myVar->slugify($old_slug.'-'.$slug_count);
-					}
-					$slug = $currentSlug;
-					$checkSlug = DB::table('products')->where('products_slug',$currentSlug)->get();
-					$slug_count++;
-				}
-				while(count($checkSlug)>0);
-				DB::table('products')->where('products_id',$products_id)->update([
-					'products_slug'	 =>   $slug
-					]);
-			}			
-			
-						
-			if($request->hasFile($products_left_banner) and in_array($request->$products_left_banner->extension(), $extensions)){
-				$image = $request->$products_left_banner;
-				$fileName = 'left_'.$languages_data->languages_id.time().'.'.$image->getClientOriginalName();
-				$image->move('resources/assets/images/products_banners/', $fileName);
-				$leftBanner = 'resources/assets/images/products_banners/'.$fileName; 
-			}else{
-				$leftBanner = '';
-			}	
-			
-			if($request->hasFile($products_right_banner) and in_array($request->$products_right_banner->extension(), $extensions)){
-				$image = $request->$products_right_banner;
-				$fileName = 'right_'.$languages_data->languages_id.time().'.'.$image->getClientOriginalName();
-				$image->move('resources/assets/images/products_banners/', $fileName);
-				$rightBanner = 'resources/assets/images/products_banners/'.$fileName; 
-			}else{
-				$rightBanner = '';
-			}	
-			
-			
-			DB::table('products_description')->insert([
-					'products_name'  	     		 	=>   $request->$products_name,
-					'language_id'			 		 	=>   $languages_data->languages_id,
-					'products_id'					 	=>   $products_id,
-					'products_url'			 		 	=>   $request->$products_url,
-					'products_left_banner'			 	=>   $leftBanner,
-					'products_left_banner_start_date'	=>   $leftStartDateFormat,
-					'products_left_banner_expire_date'	=>   $leftExpireDateFormat,
-					'products_right_banner'				=>   $rightBanner,
-					'products_right_banner_start_date'	=>   $rightStartDateFormat,
-					'products_right_banner_expire_date'	=>   $rightExpireDateFormat,
-					'products_description'	 			=>   addslashes($request->$products_description)
-					]);
-		}	
-		
-		//flash sale product
-		if($request->isFlash == 'yes'){
-			
-			$startdate = $request->flash_start_date;
-			$starttime = $request->flash_start_time;
-		
-			$start_date = str_replace('/','-',$startdate.' '.$starttime);
-			$flash_start_date = strtotime($start_date);
-			
-			$expiredate = $request->flash_expires_date;
-			$expiretime = $request->flash_end_time;
-		
-			$expire_date = str_replace('/','-',$expiredate.' '.$expiretime);
-			$flash_expires_date = strtotime($expire_date);
-					
 
-			DB::table('flash_sale')->insert([
-					'products_id'					  =>     $products_id,
-					'flash_sale_products_price'    	  =>     $request->flash_sale_products_price,
-					'flash_sale_date_added'    		  =>     time(),
-					'flash_start_date'     			  =>     $flash_start_date,
-					'flash_expires_date'     		  =>     $flash_expires_date,
-					'flash_status'     				  =>     $request->flash_status
-				]);
-		}
-		
-		//special product
-		if($request->isSpecial == 'yes'){
-			
-			DB::table('specials')->where('products_id','=',$products_id)->update([
-					'specials_last_modified'    	  =>    time(),
-					'date_status_change'			  =>	time(),
-					'status'     					  =>    0,
-				]);
-			
-			
-			DB::table('specials')->insert([
-					'products_id'					  =>     $products_id,
-					'specials_new_products_price'     =>     $request->specials_new_products_price,
-					'specials_date_added'    		  =>     time(),
-					'expires_date'     				  =>     $expiryDateFormate,
-					'status'     					  =>     $request->status,
-				]);
-		}
-				
-		foreach($request->categories as $categories){
-			DB::table('products_to_categories')->insert([
-						'products_id'   	=>     $products_id,
-						'categories_id'     =>     $categories
-					]);
-		}
-							
-		$options = DB::table('products_options')
-					->join('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
-					->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')->where('products_options_descriptions.language_id', $language_id)->get();
-		if(!empty($options) and count($options)>0){
-			$result['options'] = $options;
-		}else{
-			$result['options'] = '';
-		}
-			
-		$options_value = DB::table('products_options_values')->join('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )->where('products_options_values_descriptions.language_id','=', $language_id)->get();
-		
-		if(!empty($options_value) and count($options_value)>0){
-			$result['options_value'] = $options_value;
-		}else{
-			$result['options_value'] = '';
-		}
-		
-		$result['data'] = array('products_id'=>$products_id, 'language_id'=>$language_id);
-		
-		//notify users	
-		$myVar = new AdminAlertController();
-		$alertSetting = $myVar->newProductNotification($products_id);
-		
-		if($request->products_type==1){
-			return redirect('admin/addproductattribute/'.$products_id);
-		}else{
-			return redirect('admin/addinventory/'.$products_id);
-		}
-		}
-	}
-	
-	public function addinventory(Request $request){
-		if(session('products_create')==0 or session('products_update')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{		
+    //deleteProduct
+    public function deleteproduct(Request $request)
+    {
+        if (session('products_delete') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
 
-		$title = array('pageTitle' => Lang::get("labels.ProductInventory"));
-		$language_id      =   '1';	
-		$products_id      =   $request->id;					
+            $products_id = $request->products_id;
 
-		$result = array();	
-		$message = array();
-		$errorMessage = array();
-		$myVar = new AdminSiteSettingController();
-		$result['currency'] = $myVar->getSetting();	
+            $categories = DB::table('products_to_categories')->where('products_id', $products_id)->delete();
+            $categories = DB::table('products')->where('products_id', $products_id)->delete();
+            $categories = DB::table('specials')->where('products_id', $products_id)->delete();
+            $categories = DB::table('products_description')->where('products_id', $products_id)->delete();
+            $categories = DB::table('products_attributes')->where('products_id', $products_id)->delete();
+            $categories = DB::table('inventory')->where('products_id', $products_id)->delete();
+            $categories = DB::table('inventory_detail')->where('products_id', $products_id)->delete();
+            $categories = DB::table('flash_sale')->where('products_id', $products_id)->delete();
+            $categories = DB::table('products_images')->where('products_id', $products_id)->delete();
 
-		$result['products'] = $this->getProducts($products_id);
-		$result['message'] = $message;
-		$result['errorMessage'] = $errorMessage;	
+            return redirect()->back()->withErrors([Lang::get("labels.ProducthasbeendeletedMessage")]);
+        }
+    }
 
-		$result2 = array();
-		$index = 0;
-		$stocks = 0;
-		$min_level = 0;
-		$max_level = 0;	
-		$purchase_price  = 0;
-		if($result['products'][0]->products_type!=1){	
+    //get product
+    public function getProducts($products_id)
+    {
 
-			$addedStock = DB::table('inventory')->where('products_id',$result['products'][0]->products_id)->where('stock_type','in')->sum('stock');
-			$purchasedStock = DB::table('inventory')->where('products_id',$result['products'][0]->products_id)->where('stock_type','out')->sum('stock');
-			
-			$purchase_price = DB::table('inventory')->where('products_id',$result['products'][0]->products_id)->sum('purchase_price');
-			$stocks = $addedStock - $purchasedStock;
-			$manageLevel = DB::table('manage_min_max')->where('products_id',$result['products'][0]->products_id)->get();
-			if(count($manageLevel)>0){
-				$min_level = $manageLevel[0]->min_level;
-				$max_level = $manageLevel[0]->max_level;
-			}
-		}
+        $language_id = 1;
 
-		$result['purchase_price'] = $purchase_price;
-		$result['stocks'] = $stocks;
-		$result['min_level'] = $min_level;
-		$result['max_level'] = $max_level;	
-		$result['attributes'] = 	array();
-		$products_attribute = DB::table('products_attributes')->where('products_id','=', $products_id)->groupBy('options_id')->get();
+        $product = DB::table('products')
+            ->leftJoin('products_description', 'products_description.products_id', '=', 'products.products_id')
+            ->leftJoin('manufacturers', 'manufacturers.manufacturers_id', '=', 'products.manufacturers_id')
+            ->leftJoin('manufacturers_info', 'manufacturers.manufacturers_id', '=', 'manufacturers_info.manufacturers_id')
+            ->LeftJoin('specials', function ($join) {
+                $join->on('specials.products_id', '=', 'products.products_id')->where('status', '=', '1');
+            })
+            ->select('products.*', 'products_description.*', 'manufacturers.*', 'manufacturers_info.manufacturers_url', 'specials.specials_id', 'specials.products_id as special_products_id', 'specials.specials_new_products_price as specials_products_price', 'specials.specials_date_added as specials_date_added', 'specials.specials_last_modified as specials_last_modified', 'specials.expires_date')
+            ->where('products_description.language_id', '=', $language_id);
 
-		if(count($products_attribute)>0){
-			$index2 = 0;
+        if ($products_id != null) {
+            $product->where('products.products_id', '=', $products_id);
+        } else {
+            $product->orderBy('products.products_id', 'DESC');
+        }
 
-			foreach($products_attribute as $attribute_data){
+        $products = $product->get();
+        return ($products);
+    }
 
-				$option_name = DB::table('products_options')
+    public function products(Request $request)
+    {
+        if (session('products_view') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
+            $title       = array('pageTitle' => Lang::get("labels.Products"));
+            $language_id = '1';
+            $results     = array();
 
-					->join('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+            //get function from other controller
+            $myVar         = new AdminCategoriesController();
+            $subCategories = $myVar->getSubCategories($language_id);
 
-					->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')->where('products_options_descriptions.language_id', $language_id)->where('products_options.products_options_id',$attribute_data->options_id)->get();
+            $data = DB::table('products')
+                ->leftJoin('products_description', 'products_description.products_id', '=', 'products.products_id')
+                ->LeftJoin('manufacturers', function ($join) {
+                    $join->on('manufacturers.manufacturers_id', '=', 'products.manufacturers_id');
+                })
+                ->LeftJoin('specials', function ($join) {
+                    $join->on('specials.products_id', '=', 'products.products_id')->where('status', '=', '1');
+                });
 
-				
+            if (isset($_REQUEST['categories_id']) and !empty($_REQUEST['categories_id']) or !empty(session('categories_id'))) {
+                $data->leftJoin('products_to_categories', 'products.products_id', '=', 'products_to_categories.products_id')
+                    ->leftJoin('categories', 'categories.categories_id', '=', 'products_to_categories.categories_id');
+            }
 
-				if(count($option_name)>0){
+            $data->select('products.*', 'products_description.*', 'specials.specials_id', 'manufacturers.*', 'specials.products_id as special_products_id', 'specials.specials_new_products_price as specials_products_price', 'specials.specials_date_added as specials_date_added', 'specials.specials_last_modified as specials_last_modified', 'specials.expires_date')
+                ->where('products_description.language_id', '=', $language_id);
 
-					$temp = array();
+            if (isset($_REQUEST['categories_id']) and !empty($_REQUEST['categories_id'])) {
 
-					$temp_option['id'] = $attribute_data->options_id;
+                if (!empty(session('categories_id'))) {
+                    $cat_array = explode(',', session('categories_id'));
+                    $data->whereIn('products_to_categories.categories_id', '=', $cat_array);
+                }
 
-					$temp_option['name'] = $option_name[0]->products_options_name;
+                $data->where('products_to_categories.categories_id', '=', $_REQUEST['categories_id']);
 
-					$attr[$index2]['option'] = $temp_option;
+            } else {
+                if (!empty(session('categories_id'))) {
+                    $cat_array = explode(',', session('categories_id'));
+                    $data->whereIn('products_to_categories.categories_id', $cat_array);
+                }
+            }
 
-					
+            if (isset($_REQUEST['product']) and !empty($_REQUEST['product'])) {
+                $data->where('products_name', 'like', '%' . $_REQUEST['product'] . '%');
+            }
 
-					// fetch all attributes add join from products_options_values table for option value name					
+            $products = $data->orderBy('products.products_id', 'DESC')->paginate(40);
 
-					$attributes_value_query =  DB::table('products_attributes')->where('products_id','=', $products_id)->where('options_id','=', $attribute_data->options_id)->get();
 
-					
+            $results['subCategories'] = $subCategories;
+            $results['products']      = $products;
 
-					foreach($attributes_value_query as $products_option_value){
+            //get function from other controller
+            $myVar               = new AdminSiteSettingController();
+            $results['currency'] = $myVar->getSetting();
+            $results['units']    = $myVar->getUnits();
 
-						
+            $currentTime = array('currentTime' => time());
+            return view("admin.products", $title)->with('results', $results);
+        }
+    }
 
-						$option_value = DB::table('products_options_values')->join('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )->where('products_options_values_descriptions.language_id','=', $language_id)->where('products_options_values.products_options_values_id','=', $products_option_value->options_values_id)->get();
+    public function addproduct(Request $request)
+    {
+        if (session('products_create') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
+            $title       = array('pageTitle' => Lang::get("labels.AddProduct"));
+            $language_id = '1';
 
-						if(count($option_value)>0){
+            $result = array();
 
-							$attributes = DB::table('products_attributes')->where([['products_id','=', $products_id],['options_id','=', $attribute_data->options_id],['options_values_id','=', $products_option_value->options_values_id]])->get();
+            //get function from other controller
+            $myVar                = new AdminCategoriesController();
+            $result['categories'] = $myVar->allCategories($language_id);
 
-							
+            //get function from other controller
+            $myVar                  = new AdminManufacturerController();
+            $result['manufacturer'] = $myVar->getManufacturer($language_id);
 
-							$temp_i['products_attributes_id'] = $attributes[0]->products_attributes_id;
+            //tax class
+            $taxClass           = DB::table('tax_class')->get();
+            $result['taxClass'] = $taxClass;
 
-							$temp_i['id'] = $products_option_value->options_values_id;
+            //get function from other controller
+            $myVar               = new AdminSiteSettingController();
+            $result['languages'] = $myVar->getLanguages();
+            $result['units']     = $myVar->getUnits();
 
-							$temp_i['value'] = $option_value[0]->products_options_values_name;
+            return view("admin.addproduct", $title)->with('result', $result);
+        }
+    }
 
-							$temp_i['price'] = $products_option_value->options_values_price;
+    //addNewProduct
+    public function addnewproduct(Request $request)
+    {
+        if (session('products_create') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
+            $title       = array('pageTitle' => Lang::get("labels.AddAttributes"));
+            $language_id = '1';
+            $date_added  = date('Y-m-d h:i:s');
 
-							$temp_i['price_prefix'] = $products_option_value->price_prefix;
+            //get function from other controller
+            $myVar      = new AdminSiteSettingController();
+            $languages  = $myVar->getLanguages();
+            $extensions = $myVar->imageType();
 
-							array_push($temp,$temp_i);						
+            $expiryDate        = str_replace('/', '-', $request->expires_date);
+            $expiryDateFormate = strtotime($expiryDate);
 
-						}
+            if ($request->hasFile('products_image') and in_array($request->products_image->extension(), $extensions)) {
+                $image    = $request->products_image;
+                $fileName = time() . '.' . $image->getClientOriginalName();
+                $image->move('resources/assets/images/product_images/', $fileName);
+                $uploadImage = 'resources/assets/images/product_images/' . $fileName;
+            } else {
+                $uploadImage = '';
+            }
 
-					}
+            $products_id = DB::table('products')->insertGetId([
+                'products_image'        => $uploadImage,
+                'manufacturers_id'      => $request->manufacturers_id,
+                'products_quantity'     => 0,
+                'products_model'        => $request->products_model,
+                'products_price'        => $request->products_price,
+                'discount_price'        => ($request->discount_price > 0) ? $request->discount_price : null,
+                'products_date_added'   => $date_added,
+                'products_weight'       => $request->products_weight,
+                'products_status'       => $request->products_status,
+                'products_tax_class_id' => $request->tax_class_id,
+                'products_weight_unit'  => $request->products_weight_unit,
+                'low_limit'             => 0,
+                'products_type'         => $request->products_type,
+                'is_feature'            => 1,
+                'products_min_order'    => $request->products_min_order,
+                'products_max_stock'    => $request->products_max_stock
+            ]);
 
-					$attr[$index2]['values'] = $temp;
+            $slug_flag = false;
+            foreach ($languages as $languages_data) {
+                $products_name        = 'products_name_' . $languages_data->languages_id;
+                $products_url         = 'products_url_' . $languages_data->languages_id;
+                $products_description = 'products_description_' . $languages_data->languages_id;
 
-					$result['attributes'] = 	$attr;	
+                //left banner
+                $products_left_banner = 'products_left_banner_' . $languages_data->languages_id;
 
-					$index2++;
-				}		
+                $products_left_banner_start_date = 'products_left_banner_start_date_' . $languages_data->languages_id;
+                if (!empty($request->$products_left_banner_start_date)) {
 
-			}
-		}else{
-			$result['attributes'] = 	array();	
-		}
+                    $leftStartDate       = str_replace('/', '-', $request->$products_left_banner_start_date);
+                    $leftStartDateFormat = strtotime($leftStartDate);
 
-		return view("admin.addinventory", $title)->with('result', $result);
+                } else {
+                    $leftStartDateFormat = '';
+                }
 
-		}
-	}
+                //expire date
+                $products_left_banner_expire_date = 'products_left_banner_expire_date_' . $languages_data->languages_id;
+                if (!empty($request->$products_left_banner_expire_date)) {
+                    $leftExpiretDate      = str_replace('/', '-', $request->$products_left_banner_expire_date);
+                    $leftExpireDateFormat = strtotime($leftExpiretDate);
+                } else {
+                    $leftExpireDateFormat = '';
+                }
 
-	
+                //right banner
+                $products_right_banner = 'products_right_banner_' . $languages_data->languages_id;
 
-	//currentstock
-	public function currentstock(Request $request){
-		$inventory_ref_id = '';
-		$products_id = $request->products_id;
-		$attributes = array_filter($request->attributeid);
-		$attributeid = implode(',',$attributes);
-		$postAttributes = count($attributes);
+                $products_right_banner_start_date = 'products_right_banner_start_date_' . $languages_data->languages_id;
+                if (!empty($request->$products_right_banner_start_date)) {
+                    $rightStartDate       = str_replace('/', '-', $request->$products_right_banner_start_date);
+                    $rightStartDateFormat = strtotime($rightStartDate);
+                } else {
+                    $rightStartDateFormat = '';
+                }
 
-		$inventories = DB::table('inventory')->where('products_id',$products_id)->get();
-		$reference_ids =array();
-		$stockIn = 0;
-		$stockOut = 0;
-		$purchasePrice = 0;
-		$inventory_ref_id = array();
-		foreach($inventories as $inventory){
-			$totalAttribute = DB::table('inventory_detail')->where('inventory_detail.inventory_ref_id','=',$inventory->inventory_ref_id)->get();
+                //expire date
+                $products_right_banner_expire_date = 'products_right_banner_expire_date_' . $languages_data->languages_id;
+                if (!empty($request->$products_right_banner_expire_date)) {
+                    $rightExpiretDate      = str_replace('/', '-', $request->$products_right_banner_expire_date);
+                    $rightExpireDateFormat = strtotime($rightExpiretDate);
+                } else {
+                    $rightExpireDateFormat = '';
+                }
+
+                //slug
+                if ($slug_flag == false) {
+                    $slug_flag = true;
+
+                    $slug     = $request->$products_name;
+                    $old_slug = $request->$products_name;
+
+                    $slug_count = 0;
+                    do {
+                        if ($slug_count == 0) {
+                            $currentSlug = $myVar->slugify($slug);
+                        } else {
+                            $currentSlug = $myVar->slugify($old_slug . '-' . $slug_count);
+                        }
+                        $slug      = $currentSlug;
+                        $checkSlug = DB::table('products')->where('products_slug', $currentSlug)->get();
+                        $slug_count++;
+                    } while (count($checkSlug) > 0);
+                    DB::table('products')->where('products_id', $products_id)->update([
+                        'products_slug' => $slug
+                    ]);
+                }
+
+
+                if ($request->hasFile($products_left_banner) and in_array($request->$products_left_banner->extension(), $extensions)) {
+                    $image    = $request->$products_left_banner;
+                    $fileName = 'left_' . $languages_data->languages_id . time() . '.' . $image->getClientOriginalName();
+                    $image->move('resources/assets/images/products_banners/', $fileName);
+                    $leftBanner = 'resources/assets/images/products_banners/' . $fileName;
+                } else {
+                    $leftBanner = '';
+                }
+
+                if ($request->hasFile($products_right_banner) and in_array($request->$products_right_banner->extension(), $extensions)) {
+                    $image    = $request->$products_right_banner;
+                    $fileName = 'right_' . $languages_data->languages_id . time() . '.' . $image->getClientOriginalName();
+                    $image->move('resources/assets/images/products_banners/', $fileName);
+                    $rightBanner = 'resources/assets/images/products_banners/' . $fileName;
+                } else {
+                    $rightBanner = '';
+                }
+
+
+                DB::table('products_description')->insert([
+                    'products_name'                     => $request->$products_name,
+                    'language_id'                       => $languages_data->languages_id,
+                    'products_id'                       => $products_id,
+                    'products_url'                      => $request->$products_url,
+                    'products_left_banner'              => $leftBanner,
+                    'products_left_banner_start_date'   => $leftStartDateFormat,
+                    'products_left_banner_expire_date'  => $leftExpireDateFormat,
+                    'products_right_banner'             => $rightBanner,
+                    'products_right_banner_start_date'  => $rightStartDateFormat,
+                    'products_right_banner_expire_date' => $rightExpireDateFormat,
+                    'products_description'              => addslashes($request->$products_description)
+                ]);
+            }
+
+            //flash sale product
+            if ($request->isFlash == 'yes') {
+
+                $startdate = $request->flash_start_date;
+                $starttime = $request->flash_start_time;
+
+                $start_date       = str_replace('/', '-', $startdate . ' ' . $starttime);
+                $flash_start_date = strtotime($start_date);
+
+                $expiredate = $request->flash_expires_date;
+                $expiretime = $request->flash_end_time;
+
+                $expire_date        = str_replace('/', '-', $expiredate . ' ' . $expiretime);
+                $flash_expires_date = strtotime($expire_date);
+
+
+                DB::table('flash_sale')->insert([
+                    'products_id'               => $products_id,
+                    'flash_sale_products_price' => $request->flash_sale_products_price,
+                    'flash_sale_date_added'     => time(),
+                    'flash_start_date'          => $flash_start_date,
+                    'flash_expires_date'        => $flash_expires_date,
+                    'flash_status'              => $request->flash_status
+                ]);
+            }
+
+            //special product
+            if ($request->isSpecial == 'yes') {
+
+                DB::table('specials')->where('products_id', '=', $products_id)->update([
+                    'specials_last_modified' => time(),
+                    'date_status_change'     => time(),
+                    'status'                 => 0,
+                ]);
+
+
+                DB::table('specials')->insert([
+                    'products_id'                 => $products_id,
+                    'specials_new_products_price' => $request->specials_new_products_price,
+                    'specials_date_added'         => time(),
+                    'expires_date'                => $expiryDateFormate,
+                    'status'                      => $request->status,
+                ]);
+            }
+
+            foreach ($request->categories as $categories) {
+                DB::table('products_to_categories')->insert([
+                    'products_id'   => $products_id,
+                    'categories_id' => $categories
+                ]);
+            }
+
+            $options = DB::table('products_options')
+                ->join('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                ->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')->where('products_options_descriptions.language_id', $language_id)->get();
+            if (!empty($options) and count($options) > 0) {
+                $result['options'] = $options;
+            } else {
+                $result['options'] = '';
+            }
+
+            $options_value = DB::table('products_options_values')->join('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')->where('products_options_values_descriptions.language_id', '=', $language_id)->get();
+
+            if (!empty($options_value) and count($options_value) > 0) {
+                $result['options_value'] = $options_value;
+            } else {
+                $result['options_value'] = '';
+            }
+
+            $result['data'] = array('products_id' => $products_id, 'language_id' => $language_id);
+
+            //notify users
+            $myVar        = new AdminAlertController();
+            $alertSetting = $myVar->newProductNotification($products_id);
+
+            if ($request->products_type == 1) {
+                return redirect('admin/addproductattribute/' . $products_id);
+            } else {
+                return redirect('admin/addinventory/' . $products_id);
+            }
+        }
+    }
+
+    public function addinventory(Request $request)
+    {
+        if (session('products_create') == 0 or session('products_update') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
+
+            $title       = array('pageTitle' => Lang::get("labels.ProductInventory"));
+            $language_id = '1';
+            $products_id = $request->id;
+
+            $result             = array();
+            $message            = array();
+            $errorMessage       = array();
+            $myVar              = new AdminSiteSettingController();
+            $result['currency'] = $myVar->getSetting();
+
+            $result['products']     = $this->getProducts($products_id);
+            $result['message']      = $message;
+            $result['errorMessage'] = $errorMessage;
+
+            $result2        = array();
+            $index          = 0;
+            $stocks         = 0;
+            $min_level      = 0;
+            $max_level      = 0;
+            $purchase_price = 0;
+            if ($result['products'][0]->products_type != 1) {
+
+                $addedStock     = DB::table('inventory')->where('products_id', $result['products'][0]->products_id)->where('stock_type', 'in')->sum('stock');
+                $purchasedStock = DB::table('inventory')->where('products_id', $result['products'][0]->products_id)->where('stock_type', 'out')->sum('stock');
+
+                $purchase_price = DB::table('inventory')->where('products_id', $result['products'][0]->products_id)->sum('purchase_price');
+                $stocks         = $addedStock - $purchasedStock;
+                $manageLevel    = DB::table('manage_min_max')->where('products_id', $result['products'][0]->products_id)->get();
+                if (count($manageLevel) > 0) {
+                    $min_level = $manageLevel[0]->min_level;
+                    $max_level = $manageLevel[0]->max_level;
+                }
+            }
+
+            $result['purchase_price'] = $purchase_price;
+            $result['stocks']         = $stocks;
+            $result['min_level']      = $min_level;
+            $result['max_level']      = $max_level;
+            $result['attributes']     = array();
+            $products_attribute       = DB::table('products_attributes')->where('products_id', '=', $products_id)->groupBy('options_id')->get();
+
+            if (count($products_attribute) > 0) {
+                $index2 = 0;
+
+                foreach ($products_attribute as $attribute_data) {
+
+                    $option_name = DB::table('products_options')
+                        ->join('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                        ->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')->where('products_options_descriptions.language_id', $language_id)->where('products_options.products_options_id', $attribute_data->options_id)->get();
+
+
+                    if (count($option_name) > 0) {
+
+                        $temp = array();
+
+                        $temp_option['id'] = $attribute_data->options_id;
+
+                        $temp_option['name'] = $option_name[0]->products_options_name;
+
+                        $attr[$index2]['option'] = $temp_option;
+
+
+                        // fetch all attributes add join from products_options_values table for option value name
+
+                        $attributes_value_query = DB::table('products_attributes')->where('products_id', '=', $products_id)->where('options_id', '=', $attribute_data->options_id)->get();
+
+
+                        foreach ($attributes_value_query as $products_option_value) {
+
+
+                            $option_value = DB::table('products_options_values')->join('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')->where('products_options_values_descriptions.language_id', '=', $language_id)->where('products_options_values.products_options_values_id', '=', $products_option_value->options_values_id)->get();
+
+                            if (count($option_value) > 0) {
+
+                                $attributes = DB::table('products_attributes')->where([['products_id', '=', $products_id], ['options_id', '=', $attribute_data->options_id], ['options_values_id', '=', $products_option_value->options_values_id]])->get();
+
+
+                                $temp_i['products_attributes_id'] = $attributes[0]->products_attributes_id;
+
+                                $temp_i['id'] = $products_option_value->options_values_id;
+
+                                $temp_i['value'] = $option_value[0]->products_options_values_name;
+
+                                $temp_i['price'] = $products_option_value->options_values_price;
+
+                                $temp_i['price_prefix'] = $products_option_value->price_prefix;
+
+                                array_push($temp, $temp_i);
+
+                            }
+
+                        }
+
+                        $attr[$index2]['values'] = $temp;
+
+                        $result['attributes'] = $attr;
+
+                        $index2++;
+                    }
+
+                }
+            } else {
+                $result['attributes'] = array();
+            }
+
+            return view("admin.addinventory", $title)->with('result', $result);
+
+        }
+    }
+
+
+    //currentstock
+    public function currentstock(Request $request)
+    {
+        $inventory_ref_id = '';
+        $products_id      = $request->products_id;
+        $attributes       = array_filter($request->attributeid);
+        $attributeid      = implode(',', $attributes);
+        $postAttributes   = count($attributes);
+
+        $inventories      = DB::table('inventory')->where('products_id', $products_id)->get();
+        $reference_ids    = array();
+        $stockIn          = 0;
+        $stockOut         = 0;
+        $purchasePrice    = 0;
+        $inventory_ref_id = array();
+        foreach ($inventories as $inventory) {
+            $totalAttribute  = DB::table('inventory_detail')->where('inventory_detail.inventory_ref_id', '=', $inventory->inventory_ref_id)->get();
+            $totalAttributes = count($totalAttribute);
+
+            if ($postAttributes > $totalAttributes) {
+                $count = $postAttributes;
+            } elseif ($postAttributes < $totalAttributes or $postAttributes == $totalAttributes) {
+                $count = $totalAttributes;
+            }
+
+            $individualStock = DB::table('inventory')->leftjoin('inventory_detail', 'inventory_detail.inventory_ref_id', '=', 'inventory.inventory_ref_id')
+                ->selectRaw('inventory.*')
+                ->whereIn('inventory_detail.attribute_id', [$attributeid])
+                ->where(DB::raw('(select count(*) from `inventory_detail` where `inventory_detail`.`attribute_id` in (' . $attributeid . ') and `inventory_ref_id`= "' . $inventory->inventory_ref_id . '")'), '=', $count)
+                ->where('inventory.inventory_ref_id', '=', $inventory->inventory_ref_id)
+                ->groupBy('inventory_detail.inventory_ref_id')
+                ->get();
+
+            if (count($individualStock) > 0) {
+                $inventory_ref_id[] = $individualStock[0]->inventory_ref_id;
+
+                if ($individualStock[0]->stock_type == 'in') {
+                    $stockIn += $individualStock[0]->stock;
+                }
+
+                if ($individualStock[0]->stock_type == 'out') {
+                    $stockOut += $individualStock[0]->stock;
+                }
+
+                $purchasePrice += $individualStock[0]->purchase_price;
+            }
+        }
+
+        //get option name and value
+        $options_names  = array();
+        $options_values = array();
+        foreach ($attributes as $attribute) {
+            $productsAttributes = DB::table('products_attributes')
+                ->leftJoin('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                ->leftJoin('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                ->select('products_attributes.*', 'products_options.products_options_name as options_name', 'products_options_values.products_options_values_name as options_values')
+                ->where('products_attributes_id', $attribute)->get();
+
+            $options_names[]  = $productsAttributes[0]->options_name;
+            $options_values[] = $productsAttributes[0]->options_values;
+        }
+
+        $options_names_count = count($options_names);
+        $options_names       = implode("','", $options_names);
+        $options_names       = "'" . $options_names . "'";
+        $options_values      = "'" . implode("','", $options_values) . "'";
+
+        //orders products
+        $orders_products = DB::table('orders_products')->where('products_id', $products_id)->get();
+        /*$stockOut = 0;
+		foreach($orders_products as $orders_product){
+			$totalAttribute = DB::table('orders_products_attributes')->where('orders_products_id','=',$orders_product->orders_products_id)->get();
 			$totalAttributes = count($totalAttribute);
 
 			if($postAttributes>$totalAttributes){
 				$count = $postAttributes;
 			}elseif($postAttributes<$totalAttributes or $postAttributes==$totalAttributes){
 				$count = $totalAttributes;
-			}					
-
-			$individualStock = DB::table('inventory')->leftjoin('inventory_detail','inventory_detail.inventory_ref_id','=','inventory.inventory_ref_id')
-				->selectRaw('inventory.*')
-				->whereIn('inventory_detail.attribute_id', [$attributeid])
-				->where(DB::raw('(select count(*) from `inventory_detail` where `inventory_detail`.`attribute_id` in ('.$attributeid.') and `inventory_ref_id`= "'.$inventory->inventory_ref_id.'")'),'=',$count)
-				->where('inventory.inventory_ref_id','=',$inventory->inventory_ref_id)	
-				->groupBy('inventory_detail.inventory_ref_id')
-				->get();					
-			
-			if(count($individualStock)>0){	
-				$inventory_ref_id[] = $individualStock[0]->inventory_ref_id;
-				
-				if($individualStock[0]->stock_type=='in'){
-					$stockIn += $individualStock[0]->stock;
-				}
-				
-				if($individualStock[0]->stock_type=='out'){
-					$stockOut += $individualStock[0]->stock;
-				}
-				
-				$purchasePrice += $individualStock[0]->purchase_price;
-			}	
-		}			
-
-		//get option name and value
-		$options_names  = array();
-		$options_values = array(); 		
-		foreach($attributes as $attribute){
-			$productsAttributes = DB::table('products_attributes')
-					->leftJoin('products_options','products_options.products_options_id','=','products_attributes.options_id')
-					->leftJoin('products_options_values','products_options_values.products_options_values_id','=','products_attributes.options_values_id')
-					->select('products_attributes.*', 'products_options.products_options_name as options_name', 'products_options_values.products_options_values_name as options_values')
-					->where('products_attributes_id',$attribute)->get();			
-
-			$options_names[] = $productsAttributes[0]->options_name;
-			$options_values[] = $productsAttributes[0]->options_values;
-		}		
-
-		$options_names_count = count($options_names);
-		$options_names = implode ( "','", $options_names);
-		$options_names = "'" . $options_names . "'";
-		$options_values = "'" . implode ( "','", $options_values ) . "'";				
-
-		//orders products
-		$orders_products = DB::table('orders_products')->where('products_id',$products_id)->get();
-		/*$stockOut = 0;
-		foreach($orders_products as $orders_product){
-			$totalAttribute = DB::table('orders_products_attributes')->where('orders_products_id','=',$orders_product->orders_products_id)->get();
-			$totalAttributes = count($totalAttribute);			
-
-			if($postAttributes>$totalAttributes){
-				$count = $postAttributes;
-			}elseif($postAttributes<$totalAttributes or $postAttributes==$totalAttributes){
-				$count = $totalAttributes;
-			}						
+			}
 
 			$products = DB::select("select orders_products.* from `orders_products` left join `orders_products_attributes` on `orders_products_attributes`.`orders_products_id` = `orders_products`.`orders_products_id` where `orders_products`.`products_id`='".$products_id."' and `orders_products_attributes`.`products_options` in (".$options_names.") and `orders_products_attributes`.`products_options_values` in (".$options_values.") and (select count(*) from `orders_products_attributes` where `orders_products_attributes`.`products_id` = '".$products_id."' and `orders_products_attributes`.`products_options` in (".$options_names.") and `orders_products_attributes`.`products_options_values` in (".$options_values.") and `orders_products_attributes`.`orders_products_id`= '".$orders_product->orders_products_id."') = ".$count." and `orders_products`.`orders_products_id` = '".$orders_product->orders_products_id."' group by `orders_products_attributes`.`orders_products_id`");
 			if(count($products)>0){
 				$stockOut += $products[0]->products_quantity;
-			}	
+			}
 		}*/
 
-		$result = array();
-		$result['purchasePrice'] = $purchasePrice;
-		$result['remainingStock'] = $stockIn - $stockOut;		
+        $result                   = array();
+        $result['purchasePrice']  = $purchasePrice;
+        $result['remainingStock'] = $stockIn - $stockOut;
 
-		if(!empty($inventory_ref_id)){
-			$inventory_ref_id = implode(',',$inventory_ref_id);
-			$minMax = DB::table('manage_min_max')->where([['inventory_ref_id', $inventory_ref_id],['products_id',$products_id]])->get();		
-		}else{
-			$minMax = '';
-		}
+        if (!empty($inventory_ref_id)) {
+            $inventory_ref_id = implode(',', $inventory_ref_id);
+            $minMax           = DB::table('manage_min_max')->where([['inventory_ref_id', $inventory_ref_id], ['products_id', $products_id]])->get();
+        } else {
+            $minMax = '';
+        }
 
-		$result['inventory_ref_id'] = $inventory_ref_id;		
-		$result['minMax'] = $minMax;
+        $result['inventory_ref_id'] = $inventory_ref_id;
+        $result['minMax']           = $minMax;
 
-		print_r(json_encode($result));
+        print_r(json_encode($result));
 
-	}
+    }
 
-	
 
-	//addnewstock
-	public function addnewstock(Request $request){
+    //addnewstock
+    public function addnewstock(Request $request)
+    {
 
-		if(session('products_create')==0 or session('products_update')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{
-		$products_id = $request->products_id;
-		$products = $this->getProducts($products_id);	
+        if (session('products_create') == 0 or session('products_update') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
+            $products_id = $request->products_id;
+            $products    = $this->getProducts($products_id);
 
-		$inventory_ref_id = DB::table('inventory')->insertGetId([
-				'products_id'   		=>   $products_id,
-				'reference_code'  		=>   $request->reference_code,
-				'stock'  				=>   $request->stock,
-				'admin_id'  			=>   auth()->guard('admin')->user()->myid,
-				'added_date'	  		=>   time(),
-				'purchase_price'  		=>   $request->purchase_price,
-				'stock_type'  			=>   'in',
-				]);
+            $inventory_ref_id = DB::table('inventory')->insertGetId([
+                'products_id'    => $products_id,
+                'reference_code' => $request->reference_code,
+                'stock'          => $request->stock,
+                'admin_id'       => auth()->guard('admin')->user()->myid,
+                'added_date'     => time(),
+                'purchase_price' => $request->purchase_price,
+                'stock_type'     => 'in',
+            ]);
 
-		
 
-		if($products[0]->products_type==1){
+            if ($products[0]->products_type == 1) {
 
-			foreach($request->attributeid as $attribute){			
+                foreach ($request->attributeid as $attribute) {
 
-				if(!empty($attribute)){
+                    if (!empty($attribute)) {
 
-					DB::table('inventory_detail')->insert([
+                        DB::table('inventory_detail')->insert([
 
-						'inventory_ref_id'  =>   $inventory_ref_id,
+                            'inventory_ref_id' => $inventory_ref_id,
 
-						'products_id'  		=>   $products_id,
+                            'products_id' => $products_id,
 
-						'attribute_id'		=>   $attribute,
+                            'attribute_id' => $attribute,
 
-					]);
+                        ]);
 
-				}
+                    }
 
-			}
+                }
 
-		}
+            }
 
-		
 
-		return redirect()->back()->withErrors([Lang::get("labels.inventoryaddedsuccessfully")]);
+            return redirect()->back()->withErrors([Lang::get("labels.inventoryaddedsuccessfully")]);
 
-		}
+        }
 
-	}
+    }
 
-	
 
-	//addminmax
+    //addminmax
 
-	public function addminmax(Request $request){
+    public function addminmax(Request $request)
+    {
 
-		if(session('products_create')==0 or session('products_update')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{
-		$products_id = $request->products_id;
-		$products = $this->getProducts($products_id);
-		
+        if (session('products_create') == 0 or session('products_update') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
+            $products_id = $request->products_id;
+            $products    = $this->getProducts($products_id);
 
-		if($products[0]->products_type==1){
-			$inventory_ref_id = $request->inventory_ref_id;
-		}else{
-			$inventory_ref_id = 0;
-		}	
 
-		$checkExist = DB::table('manage_min_max')->where('products_id',$products_id)->where('inventory_ref_id',$inventory_ref_id)->get();
-		if(count($checkExist)==0){
-			DB::table('manage_min_max')->insertGetId([
-				'products_id'   		=>   $products_id,
-				'min_level'  			=>   $request->min_level,
-				'max_level'  			=>   $request->max_level,
-				'inventory_ref_id'	  	=>   $inventory_ref_id,
+            if ($products[0]->products_type == 1) {
+                $inventory_ref_id = $request->inventory_ref_id;
+            } else {
+                $inventory_ref_id = 0;
+            }
 
-				]);
+            $checkExist = DB::table('manage_min_max')->where('products_id', $products_id)->where('inventory_ref_id', $inventory_ref_id)->get();
+            if (count($checkExist) == 0) {
+                DB::table('manage_min_max')->insertGetId([
+                    'products_id'      => $products_id,
+                    'min_level'        => $request->min_level,
+                    'max_level'        => $request->max_level,
+                    'inventory_ref_id' => $inventory_ref_id,
 
-		}else{
+                ]);
 
-			DB::table('manage_min_max')->where('products_id', $products_id)->update([
+            } else {
 
-				'min_level'  			=>   $request->min_level,
+                DB::table('manage_min_max')->where('products_id', $products_id)->update([
 
-				'max_level'  			=>   $request->max_level,
+                    'min_level' => $request->min_level,
 
-				'inventory_ref_id'	  	=>   $inventory_ref_id,
+                    'max_level' => $request->max_level,
 
-				]);
+                    'inventory_ref_id' => $inventory_ref_id,
 
-				
+                ]);
 
-		}
 
-				
+            }
 
-		return redirect()->back()->withErrors([Lang::get("labels.Min max level added successfully")]);
 
-		}
+            return redirect()->back()->withErrors([Lang::get("labels.Min max level added successfully")]);
 
-	}
+        }
 
-		
+    }
 
-	//getOptions
 
-	public function getOptions(Request $request){
+    //getOptions
 
-		
+    public function getOptions(Request $request)
+    {
 
-		$options = DB::table('products_options')
 
-			->where('language_id','=', $request->languages_id)
+        $options = DB::table('products_options')
+            ->where('language_id', '=', $request->languages_id)
+            ->get();
 
-			->get();
 
-			
+        if (count($options) > 0) {
 
-		if(count($options)>0){	
+            $options_name[] = "<option value=''>" . Lang::get("labels.ChooseValue") . "</option>";
 
-			$options_name[] = "<option value=''>".Lang::get("labels.ChooseValue")."</option>";
+            foreach ($options as $options_data) {
 
-			foreach($options as $options_data){
+                $options_name[] = "<option value='" . $options_data->products_options_id . "'>" . $options_data->products_options_name . "</option>";
 
-				$options_name[] = "<option value='".$options_data->products_options_id."'>".$options_data->products_options_name."</option>";	
+            }
 
-			}
+        } else {
 
-		}else{
+            $options_name = "<option value=''>" . Lang::get("labels.ChooseValue") . "</option>";
 
-			$options_name = "<option value=''>".Lang::get("labels.ChooseValue")."</option>";
+        }
 
-		}
+        print_r($options_name);
 
-		print_r($options_name);
+    }
 
-	}
 
-	
+    //getOptions
 
-	//getOptions
+    public function getOptionsValue(Request $request)
+    {
 
-	public function getOptionsValue(Request $request){
+        $language_id = 1;
 
-		$language_id = 1;
+        $value = DB::table('products_options_values')
+            ->join('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+            ->select('products_options_values_descriptions.*')
+            ->where('products_options_values_descriptions.language_id', '=', $language_id)
+            ->where('products_options_values.products_options_id', '=', $request->option_id)
+            ->get();
 
-		$value = DB::table('products_options_values')
 
-			->join('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')
+        if (count($value) > 0) {
 
-			->select('products_options_values_descriptions.*')
+            foreach ($value as $value_data) {
 
-			->where('products_options_values_descriptions.language_id','=', $language_id)
+                $value_name[] = "<option value='" . $value_data->products_options_values_id . "'>" . $value_data->options_values_name . "</option>";
 
-			->where('products_options_values.products_options_id','=', $request->option_id)
+            }
 
-			->get();
+        } else {
 
-			
+            $value_name = "<option value=''>" . Lang::get("labels.ChooseValue") . "</option>";
 
-		if(count($value)>0){	
+        }
 
-			foreach($value as $value_data){
+        print_r($value_name);
 
-				$value_name[] = "<option value='".$value_data->products_options_values_id."'>".$value_data->options_values_name."</option>";	
+    }
 
-			}
 
-		}else{
+    //addproductattribute
 
-			$value_name = "<option value=''>".Lang::get("labels.ChooseValue")."</option>";
+    public function addproductattribute(Request $request)
+    {
 
-		}
+        if (session('products_create') == 0 or session('products_update') == 0) {
 
-		print_r($value_name);
+            print Lang::get("labels.You do not have to access this route");
 
-	}
+        } else {
 
-	
 
-	
+            $language_id = 1;
 
-	//addproductattribute
 
-	public function addproductattribute(Request $request){
+            $title = array('pageTitle' => Lang::get("labels.AddAttributes"));
 
-		if(session('products_create')==0 or session('products_update')==0){
+            $products_id = $request->id;
 
-			print Lang::get("labels.You do not have to access this route");
+            $subcategory_id = $request->subcategory_id;
 
-		}else{
 
-		
+            //get function from other controller
 
-		$language_id = 1;
+            $myVar = new AdminSiteSettingController();
 
-		
+            $result['languages'] = $myVar->getLanguages();
 
-		$title = array('pageTitle' => Lang::get("labels.AddAttributes"));
 
-		$products_id      =   $request->id;	
+            $options = DB::table('products_options')->join('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')->where('products_options_descriptions.language_id', '=', $language_id)->get();
 
-		$subcategory_id   =   $request->subcategory_id;	
 
-		
+            $result['options'] = $options;
 
-		//get function from other controller
+            $result['subcategory_id'] = $subcategory_id;
 
-		$myVar = new AdminSiteSettingController();
 
-		$result['languages'] = $myVar->getLanguages();
+            $options_value = DB::table('products_options_values')->get();
 
-		
 
-		$options = DB::table('products_options')->join('products_options_descriptions','products_options_descriptions.products_options_id','=','products_options.products_options_id')->where('products_options_descriptions.language_id','=', $language_id)->get();
+            $result['options_value'] = $options_value;
 
-		
+            $result['data'] = array('products_id' => $products_id);
 
-		$result['options'] = $options;
 
-		$result['subcategory_id'] = $subcategory_id;
+            $products_attributes = DB::table('products_attributes')
+                ->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                ->join('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_attributes.options_id')
+                ->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                ->join('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_attributes.options_values_id')
+                ->select('products_attributes.*', 'products_options_descriptions.options_name', 'products_options_values_descriptions.options_values_name')
+                ->where('products_attributes.products_id', '=', $products_id)
+                ->where('products_options_descriptions.language_id', '=', $language_id)
+                ->where('products_options_values_descriptions.language_id', '=', $language_id)
+                ->orderBy('products_attributes_id', 'DESC')
+                ->get();
 
-		
 
-		$options_value = DB::table('products_options_values')->get();
+            $result['products_attributes'] = $products_attributes;
 
-		
+            //dd($result['products_attributes']);
 
-		$result['options_value'] = $options_value;
+            return view("admin.addproductattribute", $title)->with('result', $result);
 
-		$result['data'] = array('products_id'=>$products_id);
+        }
 
-		
+    }
 
-		$products_attributes = DB::table('products_attributes')
 
-			->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+    //addproductImages
 
-			->join('products_options_descriptions','products_options_descriptions.products_options_id','=','products_attributes.options_id')
+    public function addproductimages(Request $request)
+    {
 
-			->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+        if (session('products_create') == 0 or session('products_update') == 0) {
 
-			->join('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_attributes.options_values_id')
+            print Lang::get("labels.You do not have to access this route");
 
-			->select('products_attributes.*', 'products_options_descriptions.options_name', 'products_options_values_descriptions.options_values_name' )
+        } else {
 
-			->where('products_attributes.products_id','=', $products_id)
+            $title = array('pageTitle' => Lang::get("labels.AddImages"));
 
-			->where('products_options_descriptions.language_id','=', $language_id)
+            $products_id = $request->id;
 
-			->where('products_options_values_descriptions.language_id','=', $language_id)
+            $result['data'] = array('products_id' => $products_id);
 
-			->orderBy('products_attributes_id', 'DESC')
 
-			->get();
+            $products_images = DB::table('products_images')
+                ->where('products_id', '=', $products_id)
+                ->orderBy('sort_order', 'ASC')
+                ->get();
 
-		
 
-		$result['products_attributes'] = $products_attributes;
+            $result['products_images'] = $products_images;
 
-		//dd($result['products_attributes']);
+            return view("admin.addproductimages", $title)->with('result', $result);
 
-		return view("admin.addproductattribute", $title)->with('result', $result);
+        }
 
-		}
+    }
 
-	}
 
-	
+    public function addnewproductattribute(Request $request)
+    {
 
-	//addproductImages
+        if (!empty($request->products_options_id) and !empty($request->products_id) and !empty($request->products_options_values_id) and isset($request->options_values_price)) {
 
-	public function addproductimages(Request $request){
 
-		if(session('products_create')==0 or session('products_update')==0){
+            $checkRecord = DB::table('products_attributes')->where([
 
-			print Lang::get("labels.You do not have to access this route");
+                'options_id' => $request->products_options_id,
 
-		}else{
+                'options_values_id' => $request->products_options_values_id,
 
-		$title = array('pageTitle' => Lang::get("labels.AddImages"));
+                'products_id' => $request->products_id
 
-		$products_id      =   $request->id;	
+            ])->get();
 
-		$result['data'] = array('products_id'=>$products_id);
 
-		
+            if (count($checkRecord) > 0) {
 
-		$products_images = DB::table('products_images')			
+                $products_attributes = 'already';
 
-			->where('products_id','=', $products_id)
+            } else {
 
-			->orderBy('sort_order', 'ASC')
+                $language_id = 1;
 
-			->get();
+                $products_attributes_id = DB::table('products_attributes')->insertGetId([
 
-	
+                    'products_id' => $request->products_id,
 
-		$result['products_images'] = $products_images;
+                    'options_id' => $request->products_options_id,
 
-		return view("admin.addproductimages", $title)->with('result', $result);
+                    'options_values_id' => $request->products_options_values_id,
 
-		}
+                    'options_values_price' => $request->options_values_price,
 
-	}
+                    'price_prefix' => $request->price_prefix,
 
-	
+                    'is_default' => $request->is_default
 
-	public function addnewproductattribute(Request $request){
+                ]);
 
-		if(!empty($request->products_options_id) and !empty($request->products_id) and !empty($request->products_options_values_id) and isset($request->options_values_price)){
 
-			
+                $products_attributes = DB::table('products_attributes')
+                    ->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                    ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                    ->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                    ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+                    ->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+                    ->where('products_options_descriptions.language_id', '=', $language_id)
+                    ->where('products_options_values_descriptions.language_id', '=', $language_id)
+                    ->where('products_attributes.products_id', '=', $request->products_id)
+                    ->where('products_attributes.is_default', '=', '0')
+                    ->orderBy('products_attributes_id', 'DESC')
+                    ->get();
 
-		$checkRecord = DB::table('products_attributes')->where([
+            }
 
-				'options_id'  			=>   $request->products_options_id,
 
-				'options_values_id'  	=>   $request->products_options_values_id,
+        } else {
 
-			 	'products_id'  			=> 	 $request->products_id			 
+            $products_attributes = 'empty';
 
-				])->get();
+        }
 
-		
+        return ($products_attributes);
 
-		if(count($checkRecord)>0){
+    }
 
-			$products_attributes = 'already';
 
-		}else{
+    //addNewDefaultAttribute
 
-		$language_id = 1;
+    public function addnewdefaultattribute(Request $request)
+    {
 
-		$products_attributes_id = DB::table('products_attributes')->insertGetId([
+        $language_id = 1;
 
-				'products_id'   		=>   $request->products_id,
+        $products_attributes = '';
 
-				'options_id'  			=>   $request->products_options_id,
 
-				'options_values_id'  	=>   $request->products_options_values_id,
+        if (!empty($request->products_options_id) and !empty($request->products_id) and !empty($request->products_options_values_id)) {
 
-				'options_values_price'  =>   $request->options_values_price,
+            $checkRecord = DB::table('products_attributes')->where([
 
-				'price_prefix'  		=>   $request->price_prefix,
+                'options_id' => $request->products_options_id,
 
-				'is_default'			=>	 $request->is_default
+                'products_id' => $request->products_id,
 
-				]);
+                'options_values_id' => $request->products_options_values_id,
 
-		
+            ])->get();
 
-		$products_attributes = DB::table('products_attributes')
 
-			->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+            if (count($checkRecord) > 0) {
 
-			->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                $products_attributes = 'already';
 
-			->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+            } else {
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')			
+                $products_attributes_id = DB::table('products_attributes')->insertGetId([
 
-			->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
+                    'products_id' => $request->products_id,
 
-			->where('products_options_descriptions.language_id','=',$language_id)
+                    'options_id' => $request->products_options_id,
 
-			->where('products_options_values_descriptions.language_id','=',$language_id)
+                    'options_values_id' => $request->products_options_values_id,
 
-			->where('products_attributes.products_id','=', $request->products_id)
+                    'options_values_price' => '0',
 
-			->where('products_attributes.is_default','=', '0')
+                    'price_prefix' => '+',
 
-			->orderBy('products_attributes_id', 'DESC')
+                    'is_default' => $request->is_default
 
-			->get();
+                ]);
 
-		}
 
-		
+                $products_attributes = DB::table('products_attributes')
+                    ->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                    ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                    ->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                    ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+                    ->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+                    ->where('products_options_descriptions.language_id', '=', $language_id)
+                    ->where('products_options_values_descriptions.language_id', '=', $language_id)
+                    ->where('products_attributes.products_id', '=', $request->products_id)
+                    ->where('products_attributes.is_default', '=', '1')
+                    ->orderBy('products_attributes_id', 'DESC')
+                    ->get();
 
-		}else{
+            }
 
-			$products_attributes = 'empty';
 
-		}
+        } else {
 
-		return($products_attributes);
+            $products_attributes = 'empty';
 
-	}
+        }
 
-	
 
-	//addNewDefaultAttribute
+        return ($products_attributes);
 
-	public function addnewdefaultattribute(Request $request){
+    }
 
-		$language_id = 1;
 
-		$products_attributes = '';
+    public function updateproductattribute(Request $request)
+    {
 
-		
+        if (session('products_create') == 0 or session('products_update') == 0) {
 
-		if(!empty($request->products_options_id) and !empty($request->products_id) and !empty($request->products_options_values_id)){
+            return Lang::get("labels.You do not have to access this route");
 
-		$checkRecord = DB::table('products_attributes')->where([
+        } else {
 
-				'options_id'  					=>   $request->products_options_id,
+            $language_id = 1;
 
-			 	'products_id'  					=> 	 $request->products_id,	
+            $checkRecord = DB::table('products_attributes')->where([
 
-				'options_values_id'  			=> 	 $request->products_options_values_id,	
+                'options_id' => $request->products_options_id,
 
-				])->get();
+                'options_values_id' => $request->products_options_values_id,
 
-		
+                'products_id' => $request->products_id
 
-		if(count($checkRecord)>0){
+            ])->get();
 
-			$products_attributes = 'already';
 
-		}else{
+            DB::table('products_attributes')->where('products_attributes_id', '=', $request->products_attributes_id)->update([
 
-		$products_attributes_id = DB::table('products_attributes')->insertGetId([
+                'options_id' => $request->products_options_id,
 
-				'products_id'   		=>   $request->products_id,
+                'options_values_id' => $request->products_options_values_id,
 
-				'options_id'  			=>   $request->products_options_id,
+                'options_values_price' => $request->options_values_price,
 
-				'options_values_id'  	=>   $request->products_options_values_id,
+                'price_prefix' => $request->price_prefix,
 
-				'options_values_price'  =>   '0',
+            ]);
 
-				'price_prefix'  		=>   '+',
 
-				'is_default'			=>	 $request->is_default
+            $products_attributes = DB::table('products_attributes')
+                ->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                ->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+                ->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+                ->where('products_options_descriptions.language_id', '=', $language_id)
+                ->where('products_options_values_descriptions.language_id', '=', $language_id)
+                ->where('products_attributes.products_id', '=', $request->products_id)
+                ->where('products_attributes.is_default', '=', '0')
+                ->orderBy('products_attributes_id', 'DESC')
+                ->get();
 
-				]);
 
-		
+            return ($products_attributes);
 
-		$products_attributes = DB::table('products_attributes')
+        }
 
-			->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+    }
 
-			->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
 
-			->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+    public function updatedefaultattribute(Request $request)
+    {
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')			
+        if (session('products_create') == 0 or session('products_update') == 0) {
 
-			->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
+            return Lang::get("labels.You do not have to access this route");
 
-			->where('products_options_descriptions.language_id','=',$language_id)
+        } else {
 
-			->where('products_options_values_descriptions.language_id','=',$language_id)
+            if (!empty($request->products_options_id) and !empty($request->products_id) and !empty($request->products_options_values_id)) {
 
-			->where('products_attributes.products_id','=', $request->products_id)
+                $language_id = 1;
 
-			->where('products_attributes.is_default','=', '1')
+                $checkRecord = DB::table('products_attributes')->where([
 
-			->orderBy('products_attributes_id', 'DESC')
+                    'options_id' => $request->products_options_id,
 
-			->get();
+                    'options_values_id' => $request->products_options_values_id,
 
-		}
+                    'products_id' => $request->products_id
 
-		
+                ])->get();
 
-			
 
-		}else{
+                DB::table('products_attributes')->where('products_attributes_id', '=', $request->products_attributes_id)->update([
 
-			$products_attributes = 'empty';
+                    'options_id' => $request->products_options_id,
 
-		}
+                    'options_values_id' => $request->products_options_values_id,
 
-		
+                ]);
 
-		return($products_attributes);
 
-	}
+                $products_attributes = DB::table('products_attributes')
+                    ->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                    ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                    ->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                    ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+                    ->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+                    ->where('products_options_descriptions.language_id', '=', $language_id)
+                    ->where('products_options_values_descriptions.language_id', '=', $language_id)
+                    ->where('products_attributes.products_id', '=', $request->products_id)
+                    ->where('products_attributes.is_default', '=', '1')
+                    ->orderBy('products_attributes_id', 'DESC')
+                    ->get();
 
-	
 
-	public function updateproductattribute(Request $request){
+            } else {
 
-		if(session('products_create')==0 or session('products_update')==0){
+                $products_attributes = 'empty';
 
-			return Lang::get("labels.You do not have to access this route");
+            }
 
-		}else{
+            return ($products_attributes);
 
-		$language_id = 1;
+        }
 
-		$checkRecord = DB::table('products_attributes')->where([
+    }
 
-				'options_id'  			=>   $request->products_options_id,
 
-				'options_values_id'  	=>   $request->products_options_values_id,
+    //editProduct
 
-			 	'products_id'  			=> 	 $request->products_id			 
+    public function editproduct(Request $request)
+    {
 
-				])->get();
+        if (session('products_view') == 0) {
 
-		
+            print Lang::get("labels.You do not have to access this route");
 
-				
+        } else {
 
-		DB::table('products_attributes')->where('products_attributes_id', '=', $request->products_attributes_id)->update([
+            $title = array('pageTitle' => Lang::get("labels.EditProduct"));
 
-				'options_id'  			=>   $request->products_options_id,
+            $language_id = '1';
 
-				'options_values_id'  	=>   $request->products_options_values_id,
+            $products_id = $request->id;
 
-				'options_values_price'  =>   $request->options_values_price,
+            $category_id = '0';
 
-				'price_prefix'  		=>   $request->price_prefix,
 
-				]);
+            $result = array();
 
-			
 
-		$products_attributes = DB::table('products_attributes')
+            //get categories from CategoriesController controller
 
-			->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+            $myVar = new AdminCategoriesController();
 
-			->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+            $result['categories'] = $myVar->allCategories($language_id);
 
-			->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')			
+            //get function from other controller
 
-			->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
+            $myVar = new AdminSiteSettingController();
 
-			->where('products_options_descriptions.language_id','=',$language_id)
+            $result['languages'] = $myVar->getLanguages();
 
-			->where('products_options_values_descriptions.language_id','=',$language_id)
+            $result['units'] = $myVar->getUnits();
 
-			->where('products_attributes.products_id','=', $request->products_id)
 
-			->where('products_attributes.is_default','=', '0')
+            //tax class
 
-			->orderBy('products_attributes_id', 'DESC')
+            $taxClass = DB::table('tax_class')->get();
 
-			->get();
+            $result['taxClass'] = $taxClass;
 
-			
 
-		return($products_attributes);
+            //get all sub categories
 
-		}
+            $subCategories = DB::table('categories')
+                ->leftJoin('categories_description', 'categories_description.categories_id', '=', 'categories.categories_id')
+                ->select('categories.categories_id as id', 'categories_description.categories_name as name')
+                ->where('parent_id', '!=', '0')->where('categories_description.language_id', $language_id)->get();
 
-	}
+            $result['subCategories'] = $subCategories;
 
-	
 
-	public function updatedefaultattribute(Request $request){
+            //get function from ManufacturerController controller
 
-		if(session('products_create')==0 or session('products_update')==0){
+            $myVar = new AdminManufacturerController();
 
-			return Lang::get("labels.You do not have to access this route");
+            $result['manufacturer'] = $myVar->getManufacturer($language_id);
 
-		}else{
 
-			if(!empty($request->products_options_id) and !empty($request->products_id) and !empty($request->products_options_values_id)){
+            $product = DB::table('products')
+                ->where('products.products_id', '=', $products_id)
+                ->get();
 
-				 $language_id = 1;
 
-				 $checkRecord = DB::table('products_attributes')->where([
+            $description_data = array();
 
-						'options_id'  			=>   $request->products_options_id,
+            foreach ($result['languages'] as $languages_data) {
 
-						'options_values_id'  	=>   $request->products_options_values_id,
 
-						'products_id'  			=> 	 $request->products_id			 
+                $description = DB::table('products_description')->where([
 
-						])->get();
+                    ['language_id', '=', $languages_data->languages_id],
 
-				
+                    ['products_id', '=', $products_id],
 
-			
+                ])->get();
 
-					
 
-				DB::table('products_attributes')->where('products_attributes_id', '=', $request->products_attributes_id)->update([
+                if (count($description) > 0) {
 
-						'options_id'  			=>   $request->products_options_id,
+                    $description_data[$languages_data->languages_id]['products_name'] = $description[0]->products_name;
 
-						'options_values_id'  	=>   $request->products_options_values_id,
+                    $description_data[$languages_data->languages_id]['products_url'] = $description[0]->products_url;
 
-						]);
+                    $description_data[$languages_data->languages_id]['products_description'] = $description[0]->products_description;
 
-				
+                    $description_data[$languages_data->languages_id]['products_left_banner'] = $description[0]->products_left_banner;
 
-				$products_attributes = DB::table('products_attributes')
+                    $description_data[$languages_data->languages_id]['products_left_banner_start_date'] = $description[0]->products_left_banner_start_date;
 
-					->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                    $description_data[$languages_data->languages_id]['products_left_banner_expire_date'] = $description[0]->products_left_banner_expire_date;
 
-					->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                    $description_data[$languages_data->languages_id]['products_right_banner'] = $description[0]->products_right_banner;
 
-					->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                    $description_data[$languages_data->languages_id]['products_right_banner_start_date'] = $description[0]->products_right_banner_start_date;
 
-					->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')			
+                    $description_data[$languages_data->languages_id]['products_right_banner_expire_date'] = $description[0]->products_right_banner_expire_date;
 
-					->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
+                    $description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
 
-					->where('products_options_descriptions.language_id','=',$language_id)
+                    $description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;
 
-					->where('products_options_values_descriptions.language_id','=',$language_id)
+                } else {
 
-					->where('products_attributes.products_id','=', $request->products_id)
+                    $description_data[$languages_data->languages_id]['products_name'] = '';
 
-					->where('products_attributes.is_default','=', '1')
+                    $description_data[$languages_data->languages_id]['products_url'] = '';
 
-					->orderBy('products_attributes_id', 'DESC')
+                    $description_data[$languages_data->languages_id]['products_description'] = '';
 
-					->get();
+                    $description_data[$languages_data->languages_id]['products_left_banner'] = '';
 
-					
+                    $description_data[$languages_data->languages_id]['products_left_banner_start_date'] = '';
 
-			}else{
+                    $description_data[$languages_data->languages_id]['products_left_banner_expire_date'] = '';
 
-				$products_attributes = 'empty';
+                    $description_data[$languages_data->languages_id]['products_right_banner'] = '';
 
-			}
+                    $description_data[$languages_data->languages_id]['products_right_banner_start_date'] = '';
 
-				return($products_attributes);
+                    $description_data[$languages_data->languages_id]['products_right_banner_expire_date'] = '';
 
-		}
+                    $description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
 
-	}
+                    $description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;
 
-	
+                }
 
-	//editProduct
+            }
 
-	public function editproduct(Request $request){
 
-		if(session('products_view')==0){
+            $result['description'] = $description_data;
 
-			print Lang::get("labels.You do not have to access this route");
+            $result['product'] = $product;
 
-		}else{
 
-		$title = array('pageTitle' => Lang::get("labels.EditProduct"));
+            //get product category
 
-		$language_id      =   '1';	
+            $categories = DB::table('products_to_categories')
+                ->leftJoin('categories', 'categories.categories_id', '=', 'products_to_categories.categories_id')
+                ->leftJoin('categories_description', 'categories_description.categories_id', '=', 'categories.categories_id')
+                ->where('products_id', '=', $products_id)->where('categories_description.language_id', '=', $language_id)
+                ->get();
 
-		$products_id      =   $request->id;	
 
-		$category_id	  =	  '0';
+            $mainCategories = array();
 
-		
+            $subCategories = array();
 
-		$result = array();
 
-		
+            foreach ($categories as $category) {
 
-		//get categories from CategoriesController controller		
 
-		$myVar = new AdminCategoriesController();
+                if ($category->parent_id == 0) {
 
-		$result['categories'] = $myVar->allCategories($language_id);
+                    $mainCategories[] = $category->categories_id;
 
-		
+                }
 
-		//get function from other controller
 
-		$myVar = new AdminSiteSettingController();
+                if ($category->parent_id != 0) {
 
-		$result['languages'] = $myVar->getLanguages();
+                    $subCategories[] = $category->categories_id;
 
-		$result['units'] = $myVar->getUnits();
+                }
 
-				
+            }
 
-		//tax class
 
-		$taxClass = DB::table('tax_class')->get();
+            $result['subCategories'] = $subCategories;
 
-		$result['taxClass'] = $taxClass;
+            $result['mainCategories'] = $mainCategories;
 
-		
 
-		//get all sub categories
+            $getSpecialProduct = DB::table('specials')->where('products_id', $products_id)->orderby('specials_id', 'desc')->limit(1)->get();
 
-		$subCategories = DB::table('categories')
 
-		->leftJoin('categories_description','categories_description.categories_id', '=', 'categories.categories_id')
+            if (count($getSpecialProduct) > 0) {
 
-		->select('categories.categories_id as id', 'categories_description.categories_name as name')
+                $specialProduct = $getSpecialProduct;
 
-		->where('parent_id','!=', '0')->where('categories_description.language_id', $language_id)->get();
+            } else {
 
-		$result['subCategories'] = $subCategories;
+                $specialProduct[0] = (object)array('specials_id' => '', 'products_id' => '', 'specials_new_products_price' => '', 'status' => '', 'expires_date' => '');
 
-		
+            }
 
-		//get function from ManufacturerController controller
 
-		$myVar = new AdminManufacturerController();
+            $result['specialProduct'] = $specialProduct;
 
-		$result['manufacturer'] = $myVar->getManufacturer($language_id);
 
-						
+            $getflashProduct = DB::table('flash_sale')->where('products_id', $products_id)->orderby('flash_sale_id', 'desc')->limit(1)->get();
 
-		$product = DB::table('products')
 
-			->where('products.products_id','=', $products_id)
+            if (count($getflashProduct) > 0) {
 
-			->get();
+                $flashProduct = $getflashProduct;
 
-		
+            } else {
 
-		$description_data = array();		
+                $flashProduct[0] = (object)array('products_id' => '', 'products_id' => '', 'flash_sale_products_price' => '', 'flash_status' => '', 'flash_start_date' => '', 'flash_expires_date' => '');
 
-		foreach($result['languages'] as $languages_data){
+            }
 
-			
 
-			$description = DB::table('products_description')->where([
+            $result['flashProduct'] = $flashProduct;
 
-					['language_id', '=', $languages_data->languages_id],
+            return view("admin.editproduct", $title)->with('result', $result);
 
-					['products_id', '=', $products_id],
+        }
 
-				])->get();
+    }
 
-		
 
-		
+    //updateProduct
 
-			if(count($description)>0){								
+    public function updateproduct(Request $request)
+    {
 
-				$description_data[$languages_data->languages_id]['products_name'] = $description[0]->products_name;
+        if (session('products_update') == 0) {
 
-				$description_data[$languages_data->languages_id]['products_url'] = $description[0]->products_url;
+            print Lang::get("labels.You do not have to access this route");
 
-				$description_data[$languages_data->languages_id]['products_description'] = $description[0]->products_description;
+        } else {
 
-				$description_data[$languages_data->languages_id]['products_left_banner'] =  $description[0]->products_left_banner;
+            $language_id = '1';
 
-				$description_data[$languages_data->languages_id]['products_left_banner_start_date'] = $description[0]->products_left_banner_start_date;
+            $products_id = $request->id;
 
-				$description_data[$languages_data->languages_id]['products_left_banner_expire_date'] = $description[0]->products_left_banner_expire_date;
+            $products_last_modified = date('Y-m-d h:i:s');
 
-				$description_data[$languages_data->languages_id]['products_right_banner'] = $description[0]->products_right_banner;
 
-				$description_data[$languages_data->languages_id]['products_right_banner_start_date'] = $description[0]->products_right_banner_start_date;
+            $expiryDate = str_replace('/', '-', $request->expires_date);
 
-				$description_data[$languages_data->languages_id]['products_right_banner_expire_date'] = $description[0]->products_right_banner_expire_date;
+            $expiryDateFormate = strtotime($expiryDate);
 
-				$description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
 
-				$description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;										
+            //get function from other controller
 
-			}else{
+            $myVar = new AdminSiteSettingController();
 
-				$description_data[$languages_data->languages_id]['products_name'] = '';
+            $languages = $myVar->getLanguages();
 
-				$description_data[$languages_data->languages_id]['products_url'] = '';
+            $extensions = $myVar->imageType();
 
-				$description_data[$languages_data->languages_id]['products_description'] = '';
 
-				$description_data[$languages_data->languages_id]['products_left_banner'] =  '';				
+            //check slug
 
-				$description_data[$languages_data->languages_id]['products_left_banner_start_date'] = '';
+            if ($request->old_slug != $request->slug) {
 
-				$description_data[$languages_data->languages_id]['products_left_banner_expire_date'] = '';
 
-				$description_data[$languages_data->languages_id]['products_right_banner'] =  '';				
+                $slug = $request->slug;
 
-				$description_data[$languages_data->languages_id]['products_right_banner_start_date'] = '';
+                $slug_count = 0;
 
-				$description_data[$languages_data->languages_id]['products_right_banner_expire_date'] = '';
+                do {
 
-				$description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
+                    if ($slug_count == 0) {
 
-				$description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;	
+                        $currentSlug = $myVar->slugify($request->slug);
 
-			}
+                    } else {
 
-		}
+                        $currentSlug = $myVar->slugify($request->slug . '-' . $slug_count);
 
-		
+                    }
 
-		$result['description'] = $description_data;		
+                    $slug = $currentSlug;
 
-		$result['product'] = $product;
+                    $checkSlug = DB::table('products')->where('products_slug', $currentSlug)->where('products_id', '!=', $products_id)->get();
 
-		
+                    $slug_count++;
 
-		//get product category
+                } while (count($checkSlug) > 0);
 
-		$categories = DB::table('products_to_categories')
 
-				->leftJoin('categories','categories.categories_id','=','products_to_categories.categories_id')
+            } else {
 
-				->leftJoin('categories_description','categories_description.categories_id', '=', 'categories.categories_id')				
+                $slug = $request->slug;
 
-				->where('products_id','=', $products_id)->where('categories_description.language_id','=', $language_id )
+            }
 
-				->get();
 
-				
+            if ($request->hasFile('products_image') and in_array($request->products_image->extension(), $extensions)) {
 
-		$mainCategories = array();
+                $image = $request->products_image;
 
-		$subCategories = array();
+                $fileName = time() . '.' . $image->getClientOriginalName();
 
-		
+                $image->move('resources/assets/images/product_images/', $fileName);
 
-		foreach($categories as $category){
+                $uploadImage = 'resources/assets/images/product_images/' . $fileName;
 
-			
+            } else {
 
-			if($category->parent_id==0){
+                $uploadImage = $request->oldImage;
 
-				$mainCategories[] = $category->categories_id;
+            }
 
-			}
 
-			
+            DB::table('products')->where('products_id', '=', $products_id)->update([
 
-			if($category->parent_id!=0){
+                'products_image' => $uploadImage,
 
-				$subCategories[] = $category->categories_id;				
+                'manufacturers_id' => $request->manufacturers_id,
 
-			}
+                'products_quantity' => 0,
 
-		}
+                'products_model' => $request->products_model,
 
-		
+                'products_price' => $request->products_price,
 
-		
+                'discount_price' => ($request->discount_price > 0) ? $request->discount_price : null,
 
-		$result['subCategories'] = $subCategories;
+                'products_last_modified' => $products_last_modified,
 
-		$result['mainCategories'] = $mainCategories;
+                'products_weight' => $request->products_weight,
 
-						
+                'products_status' => $request->products_status,
 
-		$getSpecialProduct = DB::table('specials')->where('products_id',$products_id)->orderby('specials_id', 'desc')->limit(1)->get();
+                'products_tax_class_id' => $request->tax_class_id,
 
-		
+                'products_weight_unit' => $request->products_weight_unit,
 
-		if(count($getSpecialProduct)>0){
+                'low_limit' => 0,
 
-			$specialProduct = $getSpecialProduct;			
+                'products_slug' => $slug,
 
-		}else{
+                'products_type' => $request->products_type,
 
-			$specialProduct[0] = (object) array('specials_id'=>'', 'products_id'=>'', 'specials_new_products_price'=>'', 'status'=>'', 'expires_date' => '');
+                'is_feature' => 1,
 
-		}
+                'products_min_order' => $request->products_min_order,
 
-		
+                'products_max_stock' => $request->products_max_stock
 
-		$result['specialProduct'] = $specialProduct;
+            ]);
 
-		
 
-						
+            foreach ($languages as $languages_data) {
 
-		$getflashProduct = DB::table('flash_sale')->where('products_id',$products_id)->orderby('flash_sale_id', 'desc')->limit(1)->get();
+                $products_name = 'products_name_' . $languages_data->languages_id;
 
-		
+                $products_url = 'products_url_' . $languages_data->languages_id;
 
-		if(count($getflashProduct)>0){
+                $products_description = 'products_description_' . $languages_data->languages_id;
 
-			$flashProduct = $getflashProduct;			
 
-		}else{
+                //left banner
 
-			$flashProduct[0] = (object) array('products_id'=>'', 'products_id'=>'', 'flash_sale_products_price'=>'', 'flash_status'=>'', 'flash_start_date' => '', 'flash_expires_date' => '');
+                $products_left_banner = 'products_left_banner_' . $languages_data->languages_id;
 
-		}
 
-		
+                $products_left_banner_start_date = 'products_left_banner_start_date_' . $languages_data->languages_id;
 
-		$result['flashProduct'] = $flashProduct;
+                if (!empty($request->$products_left_banner_start_date)) {
 
-		return view("admin.editproduct", $title)->with('result', $result);	
 
-		}
+                    $leftStartDate = str_replace('/', '-', $request->$products_left_banner_start_date);
 
-	}
+                    $leftStartDateFormat = strtotime($leftStartDate);
 
-	
 
-	
+                } else {
 
-	//updateProduct
+                    $leftStartDateFormat = '';
 
-	public function updateproduct(Request $request){
+                }
 
-		if(session('products_update')==0){
 
-			print Lang::get("labels.You do not have to access this route");
+                //expire date
 
-		}else{
+                $products_left_banner_expire_date = 'products_left_banner_expire_date_' . $languages_data->languages_id;
 
-		$language_id      =   '1';	
+                if (!empty($request->$products_left_banner_expire_date)) {
 
-		$products_id      =   $request->id;	
+                    $leftExpiretDate = str_replace('/', '-', $request->$products_left_banner_expire_date);
 
-		$products_last_modified	= date('Y-m-d h:i:s');
+                    $leftExpireDateFormat = strtotime($leftExpiretDate);
 
-		
+                } else {
 
-		$expiryDate = str_replace('/', '-', $request->expires_date);
+                    $leftExpireDateFormat = '';
 
-		$expiryDateFormate = strtotime($expiryDate);
+                }
 
-				
 
-		//get function from other controller
+                //right banner
 
-		$myVar = new AdminSiteSettingController();
+                $products_right_banner = 'products_right_banner_' . $languages_data->languages_id;
 
-		$languages = $myVar->getLanguages();		
 
-		$extensions = $myVar->imageType();
+                $products_right_banner_start_date = 'products_right_banner_start_date_' . $languages_data->languages_id;
 
-		
+                if (!empty($request->$products_right_banner_start_date)) {
 
-		//check slug
+                    $rightStartDate = str_replace('/', '-', $request->$products_right_banner_start_date);
 
-		if($request->old_slug!=$request->slug ){
+                    $rightStartDateFormat = strtotime($rightStartDate);
 
-			
+                } else {
 
-			$slug = $request->slug;
+                    $rightStartDateFormat = '';
 
-			$slug_count = 0;
+                }
 
-			do{
 
-				if($slug_count==0){
+                //expire date
 
-					$currentSlug = $myVar->slugify($request->slug);
+                $products_right_banner_expire_date = 'products_right_banner_expire_date_' . $languages_data->languages_id;
 
-				}else{
+                if (!empty($request->$products_right_banner_expire_date)) {
 
-					$currentSlug = $myVar->slugify($request->slug.'-'.$slug_count);
+                    $rightExpiretDate = str_replace('/', '-', $request->$products_right_banner_expire_date);
 
-				}
+                    $rightExpireDateFormat = strtotime($rightExpiretDate);
 
-				$slug = $currentSlug;
+                } else {
 
-				$checkSlug = DB::table('products')->where('products_slug',$currentSlug)->where('products_id','!=',$products_id)->get();
+                    $rightExpireDateFormat = '';
 
-				$slug_count++;
+                }
 
-			}
 
-			
+                $old_left_banner = 'old_left_banner_' . $languages_data->languages_id;
 
-			while(count($checkSlug)>0);		
+                $old_right_banner = 'old_right_banner_' . $languages_data->languages_id;
 
-			
 
-		}else{
+                if ($request->hasFile($products_left_banner) and in_array($request->$products_left_banner->extension(), $extensions)) {
 
-			$slug = $request->slug;
+                    $image = $request->$products_left_banner;
 
-		}
+                    $fileName = $languages_data->languages_id . time() . '.' . $image->getClientOriginalName();
 
-		
+                    $image->move('resources/assets/images/products_banners/', $fileName);
 
-		if($request->hasFile('products_image') and in_array($request->products_image->extension(), $extensions)){
+                    $leftBanner = 'resources/assets/images/products_banners/' . $fileName;
 
-			$image = $request->products_image;
+                } else {
 
-			$fileName = time().'.'.$image->getClientOriginalName();
+                    $leftBanner = $request->$old_left_banner;
 
-			$image->move('resources/assets/images/product_images/', $fileName);
+                }
 
-			$uploadImage = 'resources/assets/images/product_images/'.$fileName; 
 
-		}else{
+                if ($request->hasFile($products_right_banner) and in_array($request->$products_right_banner->extension(), $extensions)) {
 
-			$uploadImage = $request->oldImage;
+                    $image = $request->$products_right_banner;
 
-		}	
+                    $fileName = $languages_data->languages_id . time() . '.' . $image->getClientOriginalName();
 
-		
+                    $image->move('resources/assets/images/products_banners/', $fileName);
 
-		DB::table('products')->where('products_id','=',$products_id)->update([
+                    $rightBanner = 'resources/assets/images/products_banners/' . $fileName;
 
-					'products_image'  		 =>   $uploadImage,
+                } else {
 
-					'manufacturers_id'		 =>   $request->manufacturers_id,
+                    $rightBanner = $request->$old_right_banner;
 
-					'products_quantity'		 =>   0,
+                }
 
-					'products_model'		 =>   $request->products_model,
 
-					'products_price'		 =>   $request->products_price,
+                $checkExist = DB::table('products_description')->where('products_id', '=', $products_id)->where('language_id', '=', $languages_data->languages_id)->get();
 
-					'discount_price'		 =>   $request->discount_price == 0.00 ? null : $request->discount_price,
+                if (count($checkExist) > 0) {
 
-					'products_last_modified' =>   $products_last_modified,
+                    DB::table('products_description')->where('products_id', '=', $products_id)->where('language_id', '=', $languages_data->languages_id)->update([
 
-					'products_weight'		 =>   $request->products_weight,
+                        'products_name' => $request->$products_name,
 
-					'products_status'		 =>   $request->products_status,
+                        'products_url' => $request->$products_url,
 
-					'products_tax_class_id'  =>   $request->tax_class_id,
+                        'products_left_banner' => $leftBanner,
 
-					'products_weight_unit'	 =>	  $request->products_weight_unit,
+                        'products_right_banner' => $rightBanner,
 
-					'low_limit'				 =>   0,
+                        'products_left_banner_start_date' => $leftStartDateFormat,
 
-					'products_slug'			 =>   $slug,
+                        'products_left_banner_expire_date' => $leftExpireDateFormat,
 
-					'products_type'			 =>	  $request->products_type,					
+                        'products_right_banner_start_date' => $rightStartDateFormat,
 
-					'is_feature'			 =>	  1,
+                        'products_right_banner_expire_date' => $rightExpireDateFormat,
 
-					'products_min_order'	 =>	  $request->products_min_order,
+                        'products_description' => addslashes($request->$products_description)
 
-					'products_max_stock'	 =>	  $request->products_max_stock
+                    ]);
 
-					]);
+                } else {
 
-				
+                    DB::table('products_description')->insert([
 
-		foreach($languages as $languages_data){			
+                        'products_name' => $request->$products_name,
 
-			$products_name = 'products_name_'.$languages_data->languages_id;
+                        'language_id' => $languages_data->languages_id,
 
-			$products_url = 'products_url_'.$languages_data->languages_id;
+                        'products_id' => $products_id,
 
-			$products_description = 'products_description_'.$languages_data->languages_id;	
+                        'products_url' => $request->$products_url,
 
-			
+                        'products_left_banner' => $leftBanner,
 
-			//left banner
+                        'products_right_banner' => $rightBanner,
 
-			$products_left_banner = 'products_left_banner_'.$languages_data->languages_id;	
+                        'products_left_banner_start_date' => $leftStartDateFormat,
 
-					
+                        'products_left_banner_expire_date' => $leftExpireDateFormat,
 
-			$products_left_banner_start_date = 'products_left_banner_start_date_'.$languages_data->languages_id;		
+                        'products_right_banner_start_date' => $rightStartDateFormat,
 
-			if(!empty($request->$products_left_banner_start_date)){	
+                        'products_right_banner_expire_date' => $rightExpireDateFormat,
 
-			
+                        'products_description' => addslashes($request->$products_description)
 
-				$leftStartDate = str_replace('/', '-', $request->$products_left_banner_start_date);
+                    ]);
 
-				$leftStartDateFormat = strtotime($leftStartDate);
+                }
 
-			
+            }
 
-			}else{
 
-				$leftStartDateFormat = '';
+            //delete categories
 
-			}
+            DB::table('products_to_categories')->where([
 
-			
+                'products_id' => $products_id,
 
-			//expire date		
+            ])->delete();
 
-			$products_left_banner_expire_date = 'products_left_banner_expire_date_'.$languages_data->languages_id;		
 
-			if(!empty($request->$products_left_banner_expire_date)){		
+            foreach ($request->categories as $categories) {
 
-				$leftExpiretDate = str_replace('/', '-', $request->$products_left_banner_expire_date);
+                DB::table('products_to_categories')->insert([
 
-				$leftExpireDateFormat = strtotime($leftExpiretDate);
+                    'products_id' => $products_id,
 
-			}else{
+                    'categories_id' => $categories
 
-				$leftExpireDateFormat = '';
+                ]);
 
-			}
+            }
 
-			
 
-			//right banner
+            //special product
 
-			$products_right_banner = 'products_right_banner_'.$languages_data->languages_id;				
+            if ($request->isSpecial == 'yes') {
 
-					
+                DB::table('specials')->where('products_id', '=', $products_id)->update([
 
-			$products_right_banner_start_date = 'products_right_banner_start_date_'.$languages_data->languages_id;	
+                    'specials_last_modified' => time(),
 
-			if(!empty($request->$products_right_banner_start_date)){		
+                    'date_status_change' => time(),
 
-				$rightStartDate = str_replace('/', '-', $request->$products_right_banner_start_date);
+                    'status' => 0,
 
-				$rightStartDateFormat = strtotime($rightStartDate);
+                ]);
 
-			}else{
 
-				$rightStartDateFormat = '';
+                DB::table('specials')->insert([
 
-			}
+                    'products_id' => $products_id,
 
-			
+                    'specials_new_products_price' => $request->specials_new_products_price,
 
-			//expire date		
+                    'specials_date_added' => time(),
 
-			$products_right_banner_expire_date = 'products_right_banner_expire_date_'.$languages_data->languages_id;
+                    'expires_date' => $expiryDateFormate,
 
-			if(!empty($request->$products_right_banner_expire_date)){			
+                    'status' => $request->status,
 
-				$rightExpiretDate = str_replace('/', '-', $request->$products_right_banner_expire_date);
+                ]);
 
-				$rightExpireDateFormat = strtotime($rightExpiretDate);
 
-			}else{
+            } else if ($request->isSpecial == 'no') {
 
-				$rightExpireDateFormat = '';			
+                DB::table('specials')->where('products_id', '=', $products_id)->update([
 
-			}
+                    'status' => 0,
 
-			
+                ]);
 
-			$old_left_banner = 'old_left_banner_'.$languages_data->languages_id;
+            }
 
-			$old_right_banner = 'old_right_banner_'.$languages_data->languages_id;			
 
-			
+            //flash sale product
 
-			
+            if ($request->isFlash == 'yes') {
 
-			if($request->hasFile($products_left_banner) and in_array($request->$products_left_banner->extension(), $extensions)){
 
-				$image = $request->$products_left_banner;
+                DB::table('flash_sale')->where('products_id', '=', $products_id)->update([
 
-				$fileName = $languages_data->languages_id.time().'.'.$image->getClientOriginalName();
+                    'flash_sale_last_modified' => time(),
 
-				$image->move('resources/assets/images/products_banners/', $fileName);
+                    'flash_status' => 0,
 
-				$leftBanner = 'resources/assets/images/products_banners/'.$fileName; 
+                ]);
 
-			}else{
 
-				$leftBanner = $request->$old_left_banner;
+                $startdate = $request->flash_start_date;
 
-			}	
+                $starttime = $request->flash_start_time;
 
-			
 
-			if($request->hasFile($products_right_banner) and in_array($request->$products_right_banner->extension(), $extensions)){
+                $start_date = str_replace('/', '-', $startdate . ' ' . $starttime);
 
-				$image = $request->$products_right_banner;
+                $flash_start_date = strtotime($start_date);
 
-				$fileName = $languages_data->languages_id.time().'.'.$image->getClientOriginalName();
 
-				$image->move('resources/assets/images/products_banners/', $fileName);
+                $expiredate = $request->flash_expires_date;
 
-				$rightBanner = 'resources/assets/images/products_banners/'.$fileName; 
+                $expiretime = $request->flash_end_time;
 
-			}else{
 
-				$rightBanner = $request->$old_right_banner;
+                $expire_date = str_replace('/', '-', $expiredate . ' ' . $expiretime);
 
-			}	
+                $flash_expires_date = strtotime($expire_date);
 
-				
 
-			$checkExist = DB::table('products_description')->where('products_id','=',$products_id)->where('language_id','=',$languages_data->languages_id)->get();			
+                DB::table('flash_sale')->insert([
 
-			if(count($checkExist)>0){
+                    'products_id' => $products_id,
 
-				DB::table('products_description')->where('products_id','=',$products_id)->where('language_id','=',$languages_data->languages_id)->update([
+                    'flash_sale_products_price' => $request->flash_sale_products_price,
 
-					'products_name'  	     =>   $request->$products_name,
+                    'flash_sale_date_added' => time(),
 
-					'products_url'			 =>   $request->$products_url,
+                    'flash_start_date' => $flash_start_date,
 
-					'products_left_banner'	 =>   $leftBanner,
+                    'flash_expires_date' => $flash_expires_date,
 
-					'products_right_banner'	 =>   $rightBanner,					
+                    'flash_status' => $request->flash_status
 
-					'products_left_banner_start_date'	=>   $leftStartDateFormat,
+                ]);
 
-					'products_left_banner_expire_date'	=>   $leftExpireDateFormat,
 
-					'products_right_banner_start_date'	=>   $rightStartDateFormat,
+            } else if ($request->isSpecial == 'no') {
 
-					'products_right_banner_expire_date'	=>   $rightExpireDateFormat,
+                DB::table('flash_sale')->where('products_id', '=', $products_id)->update([
 
-					'products_description'	 =>   addslashes($request->$products_description)
+                    'flash_status' => 0,
 
-					]);
+                ]);
 
-			}else{
+            }
 
-				DB::table('products_description')->insert([
 
-						'products_name'  	     =>   $request->$products_name,
+            $options = DB::table('products_options')
+                ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                ->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')->where('products_options_descriptions.language_id', '1')->get();
 
-						'language_id'			 =>   $languages_data->languages_id,
 
-						'products_id'			 =>   $products_id,
+            $result['options'] = $options;
 
-						'products_url'			 =>   $request->$products_url,
 
-						'products_left_banner'	 =>   $leftBanner,
+            $options_value = DB::table('products_options_values')
+                ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+                ->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+                ->where('products_options_values_descriptions.language_id', '=', $language_id)
+                ->get();
 
-						'products_right_banner'	 =>   $rightBanner,
 
-						'products_left_banner_start_date'	=>   $leftStartDateFormat,
+            $result['options_value'] = $options_value;
 
-						'products_left_banner_expire_date'	=>   $leftExpireDateFormat,
+            $result['data'] = array('products_id' => $products_id, 'language_id' => $language_id);
 
-						'products_right_banner_start_date'	=>   $rightStartDateFormat,
 
-						'products_right_banner_expire_date'	=>   $rightExpireDateFormat,
+            if ($request->products_type == 1) {
 
-						'products_description'	 =>   addslashes($request->$products_description) 
+                return redirect('admin/addproductattribute/' . $products_id);
 
-						]);	
+            } else {
 
-			}
+                return redirect('admin/addinventory/' . $products_id);
 
-		}
+            }
 
-		
+        }
 
-		//delete categories
+    }
 
-		DB::table('products_to_categories')->where([
 
-				'products_id'  	=>   $products_id,		 
+    //deleteproductattributemodal
 
-				])->delete();
+    public function deleteproductmodal(Request $request)
+    {
 
-		
+        $products_id = $request->products_id;
 
-		
+        return view("admin/deleteproductattributemodal")->with('result', $result);
 
-		foreach($request->categories as $categories){
+    }
 
-			DB::table('products_to_categories')->insert([
 
-						'products_id'   	=>     $products_id,
+    //editProductAttribute
 
-						'categories_id'     =>     $categories
+    public function editproductattribute(Request $request)
+    {
 
-					]);
 
-		}
+        $myVar = new AdminSiteSettingController();
 
-		
+        $languages = $myVar->getLanguages();
 
-		//special product
 
-		if($request->isSpecial == 'yes'){
+        $products_id = $request->products_id;
 
-			DB::table('specials')->where('products_id','=',$products_id)->update([
+        $products_attributes_id = $request->products_attributes_id;
 
-					'specials_last_modified'    	  =>    time(),
+        $language_id = $request->language_id;
 
-					'date_status_change'			  =>	time(),
+        $options_id = $request->options_id;
 
-					'status'     					  =>    0,
 
-				]);
+        $myVar = new AdminSiteSettingController();
 
-				
+        $languages = $myVar->getLanguages();
 
-			DB::table('specials')->insert([
+        $extensions = $myVar->imageType();
 
-					'products_id'					  =>     $products_id,
 
-					'specials_new_products_price'     =>     $request->specials_new_products_price,
+        $products_id = $request->products_id;
 
-					'specials_date_added'    		  =>     time(),
+        $products_attributes_id = $request->products_attributes_id;
 
-					'expires_date'     				  =>     $expiryDateFormate,
+        $language_id = 1;
 
-					'status'     					  =>     $request->status,
+        $options_id = $request->options_id;
 
-				]);
 
-				
+        $options = DB::table('products_options')
+            ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+            ->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')
+            ->where('products_options_descriptions.language_id', '=', $language_id)
+            ->get();
 
-		}else if($request->isSpecial == 'no'){
 
-			DB::table('specials')->where('products_id','=',$products_id)->update([
+        $result['options'] = $options;
 
-					'status'     					  =>    0,
 
-				]);
+        $options_value = DB::table('products_options_values')
+            ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+            ->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+            ->where('products_options_values_descriptions.language_id', '=', $language_id)
+            ->where('products_options_values.products_options_id', '=', $options_id)
+            ->get();
 
-		}
 
-		
+        $result['options_value'] = $options_value;
 
-		//flash sale product
 
-		if($request->isFlash == 'yes'){
+        $result['data'] = array('products_id' => $request->products_id, 'products_attributes_id' => $products_attributes_id, 'language_id' => $language_id);
 
-			
 
-			DB::table('flash_sale')->where('products_id','=',$products_id)->update([
+        $products_attributes = DB::table('products_attributes')
+            ->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+            ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+            ->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+            ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+            ->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+            ->where('products_options_descriptions.language_id', '=', $language_id)
+            ->where('products_options_values_descriptions.language_id', '=', $language_id)
+            ->where('products_attributes.products_attributes_id', '=', $products_attributes_id)
+            ->get();
 
-					'flash_sale_last_modified'    	  =>    time(),
 
-					'flash_status'					  =>    0,
+        $result['products_attributes'] = $products_attributes;
 
-				]);
+        $result['languages'] = $languages;
 
-			
 
-			$startdate = $request->flash_start_date;
+        return view("admin/editproductattributeform")->with('result', $result);
 
-			$starttime = $request->flash_start_time;
+    }
 
-		
 
-			$start_date = str_replace('/','-',$startdate.' '.$starttime);
+    //editdefaultattributemodal
 
-			$flash_start_date = strtotime($start_date);
+    public function editdefaultattribute(Request $request)
+    {
 
-			
 
-			$expiredate = $request->flash_expires_date;
+        //get function from other controller
 
-			$expiretime = $request->flash_end_time;
+        $myVar = new AdminSiteSettingController();
 
-		
+        $languages = $myVar->getLanguages();
 
-			$expire_date = str_replace('/','-',$expiredate.' '.$expiretime);
+        $extensions = $myVar->imageType();
 
-			$flash_expires_date = strtotime($expire_date);
 
-					
+        $products_id = $request->products_id;
 
+        $products_attributes_id = $request->products_attributes_id;
 
+        $language_id = 1;
 
-			DB::table('flash_sale')->insert([
+        $options_id = $request->options_id;
 
-					'products_id'					  =>     $products_id,
 
-					'flash_sale_products_price'    	  =>     $request->flash_sale_products_price,
+        $options = DB::table('products_options')
+            ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+            ->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')
+            ->where('products_options_descriptions.language_id', '=', $language_id)
+            ->get();
 
-					'flash_sale_date_added'    		  =>     time(),
 
-					'flash_start_date'     			  =>     $flash_start_date,
+        $result['options'] = $options;
 
-					'flash_expires_date'     		  =>     $flash_expires_date,
 
-					'flash_status'     				  =>     $request->flash_status
+        $options_value = DB::table('products_options_values')
+            ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+            ->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+            ->where('products_options_values_descriptions.language_id', '=', $language_id)
+            ->where('products_options_values.products_options_id', '=', $options_id)
+            ->get();
 
-				]);
 
-				
+        $result['options_value'] = $options_value;
 
-		}else if($request->isSpecial == 'no'){
 
-			DB::table('flash_sale')->where('products_id','=',$products_id)->update([
+        $result['data'] = array('products_id' => $request->products_id, 'products_attributes_id' => $products_attributes_id, 'language_id' => $language_id);
 
-					'flash_status'     				  =>    0,
 
-				]);
+        $products_attributes = DB::table('products_attributes')
+            ->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+            ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+            ->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+            ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+            ->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+            ->where('products_options_descriptions.language_id', '=', $language_id)
+            ->where('products_options_values_descriptions.language_id', '=', $language_id)
+            ->where('products_attributes.products_attributes_id', '=', $products_attributes_id)
+            ->get();
 
-		}
 
-		
+        $result['products_attributes'] = $products_attributes;
 
-		
+        $result['languages'] = $languages;
 
-			
 
-		$options = DB::table('products_options')
+        return view("admin/editdefaultattributeform")->with('result', $result);
 
-					->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+    }
 
-					->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')->where('products_options_descriptions.language_id','1')->get();
 
-		
+    //deleteproductattributemodal
 
-		$result['options'] = $options;
+    public function deleteproductattributemodal(Request $request)
+    {
 
-		
 
-		$options_value = DB::table('products_options_values')
+        $products_id = $request->products_id;
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')
+        $products_attributes_id = $request->products_attributes_id;
 
-			->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
 
-			->where('products_options_values_descriptions.language_id','=', $language_id)
+        $result['data'] = array('products_id' => $products_id, 'products_attributes_id' => $products_attributes_id);
 
-			->get();
 
-		
+        return view("admin/deleteproductattributemodal")->with('result', $result);
 
-		$result['options_value'] = $options_value;
+    }
 
-		$result['data'] = array('products_id'=>$products_id, 'language_id'=>$language_id);
 
-		
+    //deletedefaultattributemodal
 
-		if($request->products_type==1){
+    public function deletedefaultattributemodal(Request $request)
+    {
 
-			return redirect('admin/addproductattribute/'.$products_id);
+        $products_id = $request->products_id;
 
-		}else{
+        $products_attributes_id = $request->products_attributes_id;
 
-			return redirect('admin/addinventory/'.$products_id);
+        $result['data'] = array('products_id' => $products_id, 'products_attributes_id' => $products_attributes_id);
 
-		}		
+        return view("admin/deletedefaultattributemodal")->with('result', $result);
 
-		}
+    }
 
-	}
 
-	
+    //deleteproductattribute
 
-	//deleteproductattributemodal
+    public function deleteproductattribute(Request $request)
+    {
 
-	public function deleteproductmodal(Request $request){		
+        if (session('products_delete') == 0) {
 
-		$products_id = $request->products_id;		
+            return Lang::get("labels.You do not have to access this route");
 
-		return view("admin/deleteproductattributemodal")->with('result', $result);
+        } else {
 
-	}
 
-		
+            $language_id = '1';
 
-	//editProductAttribute
 
-	public function editproductattribute(Request $request){
+            $checkRecord = DB::table('products_attributes')->where([
 
-		
+                'products_attributes_id' => $request->products_attributes_id,
 
-		$myVar = new AdminSiteSettingController();
+                'products_id' => $request->products_id
 
-		$languages = $myVar->getLanguages();		
+            ])->delete();
 
-		
 
-		$products_id = $request->products_id;
+            $products_attributes = DB::table('products_attributes')
+                ->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                ->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+                ->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+                ->where('products_options_descriptions.language_id', '=', $language_id)
+                ->where('products_options_values_descriptions.language_id', '=', $language_id)
+                ->where('products_attributes.products_id', '=', $request->products_id)
+                ->where('products_attributes.is_default', '=', '0')
+                ->orderBy('products_attributes_id', 'DESC')
+                ->get();
 
-		$products_attributes_id = $request->products_attributes_id;
 
-		$language_id = $request->language_id;
+            return ($products_attributes);
 
-		$options_id = $request->options_id;
+        }
 
-		
+    }
 
-		$myVar = new AdminSiteSettingController();
 
-		$languages = $myVar->getLanguages();		
+    //deleteproductattribute
 
-		$extensions = $myVar->imageType();
+    public function deletedefaultattribute(Request $request)
+    {
 
-		
 
-		$products_id = $request->products_id;
+        if (session('products_delete') == 0) {
 
-		$products_attributes_id = $request->products_attributes_id;
+            return Lang::get("labels.You do not have to access this route");
 
-		$language_id = 1;
+        } else {
 
-		$options_id = $request->options_id;
 
-		
+            $language_id = '1';
 
-		$options = DB::table('products_options')
 
+            $checkRecord = DB::table('products_attributes')->where([
 
-			->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                'products_attributes_id' => $request->products_attributes_id,
 
-			->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')
+                'products_id' => $request->products_id
 
-			->where('products_options_descriptions.language_id','=', $language_id)
+            ])->delete();
 
-			->get();
 
-				
+            $products_attributes = DB::table('products_attributes')
+                ->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                ->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                ->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                ->leftJoin('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+                ->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name')
+                ->where('products_options_descriptions.language_id', '=', $language_id)
+                ->where('products_options_values_descriptions.language_id', '=', $language_id)
+                ->where('products_attributes.products_id', '=', $request->products_id)
+                ->where('products_attributes.is_default', '=', '1')
+                ->orderBy('products_attributes_id', 'DESC')
+                ->get();
 
-		$result['options'] = $options;
 
-					
+            return ($products_attributes);
 
-		$options_value = DB::table('products_options_values')
+        }
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')
+    }
 
-			->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
 
-			->where('products_options_values_descriptions.language_id','=', $language_id)
+    //addnewproductimage
 
-			->where('products_options_values.products_options_id','=', $options_id)
+    public function addnewproductimage(Request $request)
+    {
 
-			->get();
+        if (session('products_create') == 0 or session('products_update') == 0) {
 
-						
+            print Lang::get("labels.You do not have to access this route");
 
-		$result['options_value'] = $options_value;
+        } else {
 
-		
 
-		$result['data'] = array('products_id'=>$request->products_id, 'products_attributes_id'=>$products_attributes_id, 'language_id'=>$language_id);
+            $myVar = new AdminSiteSettingController();
 
-		
+            $extensions = $myVar->imageType();
 
-		$products_attributes = DB::table('products_attributes')
 
-			->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+            if ($request->hasFile('newImage') and in_array($request->newImage->extension(), $extensions)) {
 
-			->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')			
 
-			->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+                $image = $request->newImage;
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')
+                $fileName = time() . '.' . $image->getClientOriginalName();
 
-			->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
+                $image->move('resources/assets/images/product_images/', $fileName);
 
-			->where('products_options_descriptions.language_id','=',$language_id)
+                $uploadImage = 'resources/assets/images/product_images/' . $fileName;
 
-			->where('products_options_values_descriptions.language_id','=',$language_id)
 
-			->where('products_attributes.products_attributes_id','=', $products_attributes_id)
+                DB::table('products_images')->insert([
 
-			->get();
+                    'products_id' => $request->products_id,
 
-		
+                    'image' => $uploadImage,
 
-		$result['products_attributes'] = $products_attributes;
+                    'htmlcontent' => $request->htmlcontent,
 
-		$result['languages'] = $languages;
+                    'sort_order' => $request->sort_order,
 
-		
+                ]);
 
-		return view("admin/editproductattributeform")->with('result', $result);
 
-	}
+                $products_images = DB::table('products_images')
+                    ->where('products_id', '=', $request->products_id)
+                    ->orderBy('sort_order', 'ASC')
+                    ->get();
 
-	
 
-	//editdefaultattributemodal
+            } else {
 
-	public function editdefaultattribute(Request $request){
+                $products_images = '';
 
-		
+            }
 
-		//get function from other controller
+            return ($products_images);
 
-		$myVar = new AdminSiteSettingController();
+        }
 
-		$languages = $myVar->getLanguages();		
+    }
 
-		$extensions = $myVar->imageType();
 
-		
+    public function editproductimage(Request $request)
+    {
 
-		$products_id = $request->products_id;
 
-		$products_attributes_id = $request->products_attributes_id;
+        $products_images = DB::table('products_images')
+            ->where('id', '=', $request->id)
+            ->get();
 
-		$language_id = 1;
 
-		$options_id = $request->options_id;
+        return view("admin/editproductimageform")->with('result', $products_images);
 
-		
+    }
 
-		$options = DB::table('products_options')
 
-			->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+    //updateproductimage
 
-			->select('products_options.products_options_id', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id')
+    public function updateproductimage(Request $request)
+    {
 
-			->where('products_options_descriptions.language_id','=', $language_id)
+        if (session('products_create') == 0 or session('products_update') == 0) {
 
-			->get();
+            return Lang::get("labels.You do not have to access this route");
 
-				
+        } else {
 
-		$result['options'] = $options;
+            $myVar = new AdminSiteSettingController();
 
-					
+            $extensions = $myVar->imageType();
 
-		$options_value = DB::table('products_options_values')
+            if ($request->hasFile('newImage') and in_array($request->newImage->extension(), $extensions)) {
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')
+                $image = $request->newImage;
 
-			->select('products_options_values.products_options_values_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
+                $fileName = time() . '.' . $image->getClientOriginalName();
 
-			->where('products_options_values_descriptions.language_id','=', $language_id)
+                $image->move('resources/assets/images/product_images/', $fileName);
 
-			->where('products_options_values.products_options_id','=', $options_id)
+                $uploadImage = 'resources/assets/images/product_images/' . $fileName;
 
-			->get();
+            } else {
 
-						
+                $uploadImage = $request->oldImage;
 
-		$result['options_value'] = $options_value;
+            }
 
-		
 
-		$result['data'] = array('products_id'=>$request->products_id, 'products_attributes_id'=>$products_attributes_id, 'language_id'=>$language_id);
+            DB::table('products_images')->where('products_id', '=', $request->products_id)->where('id', '=', $request->id)
+                ->update([
 
-		
+                    'image' => $uploadImage,
 
-		$products_attributes = DB::table('products_attributes')
+                    'htmlcontent' => $request->htmlcontent,
 
-			->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+                    'sort_order' => $request->sort_order,
 
-			->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')			
+                ]);
 
-			->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')
+            $products_images = DB::table('products_images')
+                ->where('products_id', '=', $request->products_id)
+                ->orderBy('sort_order', 'ASC')
+                ->get();
 
-			->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
 
-			->where('products_options_descriptions.language_id','=',$language_id)
+            return ($products_images);
 
-			->where('products_options_values_descriptions.language_id','=',$language_id)
+        }
 
-			->where('products_attributes.products_attributes_id','=', $products_attributes_id)
+    }
 
-			->get();
 
-		
+    //deleteproductimagemodal
 
-		$result['products_attributes'] = $products_attributes;
+    public function deleteproductimagemodal(Request $request)
+    {
 
-		$result['languages'] = $languages;
 
-		
+        $products_id = $request->products_id;
 
-		return view("admin/editdefaultattributeform")->with('result', $result);
+        $id = $request->id;
 
-	}
 
-	
+        $result['data'] = array('products_id' => $products_id, 'id' => $id);
 
-	//deleteproductattributemodal
 
-	public function deleteproductattributemodal(Request $request){
+        return view("admin/deleteproductimagemodal")->with('result', $result);
 
-		
+    }
 
-		$products_id = $request->products_id;
 
-		$products_attributes_id = $request->products_attributes_id;
+    //deleteproductimage
 
-		
+    public function deleteproductimage(Request $request)
+    {
 
-		$result['data'] = array('products_id'=>$products_id, 'products_attributes_id'=>$products_attributes_id);
+        if (session('products_delete') == 0) {
 
-		
+            return Lang::get("labels.You do not have to access this route");
 
-		return view("admin/deleteproductattributemodal")->with('result', $result);
+        } else {
 
-	}
+            DB::table('products_images')->where([
 
-	
+                'products_id' => $request->products_id,
 
-	//deletedefaultattributemodal
+                'id' => $request->id
 
-	public function deletedefaultattributemodal(Request $request){		
+            ])->delete();
 
-		$products_id = $request->products_id;
 
-		$products_attributes_id = $request->products_attributes_id;		
+            $products_images = DB::table('products_images')
+                ->where('products_id', '=', $request->products_id)
+                ->orderBy('sort_order', 'ASC')
+                ->get();
 
-		$result['data'] = array('products_id'=>$products_id, 'products_attributes_id'=>$products_attributes_id);		
 
-		return view("admin/deletedefaultattributemodal")->with('result', $result);
+            return ($products_images);
 
-	}
+        }
 
-	
+    }
 
-	//deleteproductattribute
 
-	public function deleteproductattribute(Request $request){
+    //manageoptionsvalues
 
-		if(session('products_delete')==0){
+    public function manageoptionsvalues(Request $request)
+    {
 
-			return Lang::get("labels.You do not have to access this route");
+        if (session('products_view') == 0) {
 
-		}else{
+            print Lang::get("labels.You do not have to access this route");
 
-		
+        } else {
 
-		$language_id      =   '1';
+            $title = array('pageTitle' => Lang::get("labels.Manage Values"));
 
-		
+            $data = array();
 
-		$checkRecord = DB::table('products_attributes')->where([
+            $myVar = new AdminSiteSettingController();
 
-				'products_attributes_id'  	=>   $request->products_attributes_id,
+            $extensions = $myVar->imageType();
 
-			 	'products_id'  				=> 	 $request->products_id			 
+            $products_options_id = $request->id;
 
-				])->delete();
 
-		
+            $value = DB::table('products_options_values')->where('products_options_id', $products_options_id)->get();
 
-		$products_attributes = DB::table('products_attributes')
 
-			->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+            $result = array();
 
-			->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+            $index = 0;
 
-			->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+            foreach ($value as $values_data) {
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')			
+                array_push($result, $values_data);
 
-			->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
+                $languages = $myVar->getLanguages();
 
-			->where('products_options_descriptions.language_id','=',$language_id)
 
-			->where('products_options_values_descriptions.language_id','=',$language_id)
+                $result2 = array();
 
-			->where('products_attributes.products_id','=', $request->products_id)
+                $index2 = 0;
 
-			->where('products_attributes.is_default','=', '0')
+                foreach ($languages as $language) {
 
-			->orderBy('products_attributes_id', 'DESC')
+                    array_push($result2, $language);
 
-			->get();
 
-		
+                    $values = DB::table('products_options_values_descriptions')
+                        ->where('products_options_values_id', '=', $values_data->products_options_values_id)
+                        ->where('language_id', '=', $language->languages_id)
+                        ->get();
 
-		return($products_attributes);
 
-		}
+                    $result2[$index2]->values = $values;
 
-	}
+                    $index2++;
 
-	
+                }
 
-	//deleteproductattribute
 
-	public function deletedefaultattribute(Request $request){
+                $result[$index]->data = $result2;
 
-		
+                $index++;
 
-		if(session('products_delete')==0){
+            }
 
-			return Lang::get("labels.You do not have to access this route");
+            $data['languages'] = $myVar->getLanguages();
 
-		}else{
+            $data['content'] = $result;
 
-			
+            $data['options'] = DB::table('products_options')
+                ->join('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+                ->where('products_options.products_options_id', $products_options_id)->get();
 
-		$language_id      =   '1';
 
-		
+            return view("admin.manageoptionsvalues", $title)->with('result', $data);
 
-		$checkRecord = DB::table('products_attributes')->where([
 
-					'products_attributes_id'  	=>   $request->products_attributes_id,
+        }
 
-			 		'products_id'  				=> 	 $request->products_id			 
+    }
 
-				])->delete();
 
-		
+    //addnewoptions
 
-		$products_attributes = DB::table('products_attributes')
+    public function addnewvalues(Request $request)
+    {
 
-			->join('products_options', 'products_options.products_options_id', '=', 'products_attributes.options_id')
+        if (session('products_create') == 0 or session('products_update') == 0) {
 
-			->leftJoin('products_options_descriptions', 'products_options_descriptions.products_options_id', '=', 'products_options.products_options_id')
+            print Lang::get("labels.You do not have to access this route");
 
-			->join('products_options_values', 'products_options_values.products_options_values_id', '=', 'products_attributes.options_values_id')
+        } else {
 
-			->leftJoin('products_options_values_descriptions','products_options_values_descriptions.products_options_values_id','=','products_options_values.products_options_values_id')			
 
-			->select('products_attributes.*', 'products_options_descriptions.options_name as products_options_name', 'products_options_descriptions.language_id', 'products_options_values_descriptions.options_values_name as products_options_values_name' )
+            $result = array();
 
-			->where('products_options_descriptions.language_id','=',$language_id)
 
-			->where('products_options_values_descriptions.language_id','=',$language_id)
+            //get function from other controller
 
-			->where('products_attributes.products_id','=', $request->products_id)
+            $myVar = new AdminSiteSettingController();
 
-			->where('products_attributes.is_default','=', '1')
+            $languages = $myVar->getLanguages();
 
-			->orderBy('products_attributes_id', 'DESC')
 
-			->get();
+            $i = 0;
 
-		
+            //multiple lanugauge with record
 
-		return($products_attributes);
+            foreach ($languages as $languages_data) {
 
-		}
+                $products_options_values_name = 'ValuesName_' . $languages_data->languages_id;
 
-	}
 
-	
+                if ($i == 0) {
 
-	
+                    $products_options_values_id = DB::table('products_options_values')->insertGetId([
 
-	//addnewproductimage
+                        'products_options_values_name' => $request->$products_options_values_name,
 
-	public function addnewproductimage(Request $request){
+                        'products_options_id' => $request->products_options_id
 
-		if(session('products_create')==0 or session('products_update')==0){
+                    ]);
 
-			print Lang::get("labels.You do not have to access this route");
+                    $i++;
 
-		}else{
+                }
 
-			
 
-		$myVar = new AdminSiteSettingController();	
+                DB::table('products_options_values_descriptions')->insert([
 
-		$extensions = $myVar->imageType();
+                    'options_values_name' => $request->$products_options_values_name,
 
-		
+                    'products_options_values_id' => $products_options_values_id,
 
-		if($request->hasFile('newImage') and in_array($request->newImage->extension(), $extensions)){
+                    'language_id' => $languages_data->languages_id
 
-						
+                ]);
 
-			$image = $request->newImage;
+            }
 
-			$fileName = time().'.'.$image->getClientOriginalName();
 
-			$image->move('resources/assets/images/product_images/', $fileName);
+            return redirect()->back()->withErrors([Lang::get("labels.ValuesAddedMessage")]);
 
-			$uploadImage = 'resources/assets/images/product_images/'.$fileName; 
+        }
 
-			
+    }
 
-			DB::table('products_images')->insert([
 
-				'products_id'   =>   $request->products_id,
+    //editvalues
 
-				'image'  	=>   $uploadImage,
+    public function editvalues(Request $request)
+    {
 
-				'htmlcontent'  	=>   $request->htmlcontent,
+        if (session('products_create') == 0) {
 
-				'sort_order'  	=>   $request->sort_order,
+            print Lang::get("labels.You do not have to access this route");
 
-				]);
+        } else {
 
-			
+            $title = array('pageTitle' => Lang::get("labels.Manage Options"));
 
-			$products_images = DB::table('products_images')			
 
-				->where('products_id','=', $request->products_id)
+            $myVar = new AdminSiteSettingController();
 
-				->orderBy('sort_order', 'ASC')
+            $result['languages'] = $myVar->getLanguages();
 
-				->get();
 
+            $edit = DB::table('products_options_values')->where('products_options_values_id', $request->id)->get();
 
 
-		}else{
+            $description_data = array();
 
-			$products_images = '';
+            foreach ($result['languages'] as $languages_data) {
 
-		}		
 
-		return($products_images);	
+                $description = DB::table('products_options_values_descriptions')->where([
 
-		}
+                    ['language_id', '=', $languages_data->languages_id],
 
-	}
+                    ['products_options_values_id', '=', $request->id],
 
-	
+                ])->get();
 
-	public function editproductimage(Request $request){
 
-		
+                if (count($description) > 0) {
 
-		$products_images = DB::table('products_images')			
+                    $description_data[$languages_data->languages_id]['name'] = $description[0]->options_values_name;
 
-			->where('id','=', $request->id)
+                    $description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
 
-			->get();
+                    $description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;
 
-		
+                } else {
 
-		return view("admin/editproductimageform")->with('result', $products_images);
+                    $description_data[$languages_data->languages_id]['name'] = '';
 
-	}
+                    $description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
 
-	
+                    $description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;
 
-	//updateproductimage
+                }
 
-	public function updateproductimage(Request $request){
+            }
 
-		if(session('products_create')==0 or session('products_update')==0){
 
-			return Lang::get("labels.You do not have to access this route");
+            $result['description'] = $description_data;
 
-		}else{
+            $result['editoptions'] = $edit;
 
-		$myVar = new AdminSiteSettingController();	
 
-		$extensions = $myVar->imageType();
+            return view("admin.editvalues", $title)->with('result', $result);
 
-		if($request->hasFile('newImage') and in_array($request->newImage->extension(), $extensions)){
+        }
 
-			$image = $request->newImage;
+    }
 
-			$fileName = time().'.'.$image->getClientOriginalName();
 
-			$image->move('resources/assets/images/product_images/', $fileName);
+    //updateoptions
 
-			$uploadImage = 'resources/assets/images/product_images/'.$fileName; 
+    public function updatevalue(Request $request)
+    {
 
-		}else{
+        if (session('products_update') == 0) {
 
-			$uploadImage = $request->oldImage;
+            print Lang::get("labels.You do not have to access this route");
 
-		}
+        } else {
 
-			
 
-			
+            $products_options_values_id = $request->products_options_values_id;
 
-		DB::table('products_images')->where('products_id', '=', $request->products_id)->where('id', '=', $request->id)
 
-			->update([
+            $myVar = new AdminSiteSettingController();
 
-			'image'  		=>   $uploadImage,
+            $languages = $myVar->getLanguages();
 
-			'htmlcontent'  	=>   $request->htmlcontent,
 
-			'sort_order'  	=>   $request->sort_order,
+            foreach ($languages as $languages_data) {
 
-			]);
+                $options_values_name = 'options_values_name_' . $languages_data->languages_id;
 
 
+                $checkExist = DB::table('products_options_values_descriptions')->where('products_options_values_id', '=', $products_options_values_id)->where('language_id', '=', $languages_data->languages_id)->get();
 
-		$products_images = DB::table('products_images')			
+                if (count($checkExist) > 0) {
 
-			->where('products_id','=', $request->products_id)
+                    DB::table('products_options_values_descriptions')->where('products_options_values_id', '=', $products_options_values_id)->where('language_id', '=', $languages_data->languages_id)->update([
 
-			->orderBy('sort_order', 'ASC')
+                        'options_values_name' => $request->$options_values_name,
 
-			->get();		
+                    ]);
 
-		
+                } else {
 
-		return($products_images);
+                    DB::table('products_options_values_descriptions')->insert([
 
-		}
+                        'options_values_name' => $request->$options_values_name,
 
-	}
+                        'language_id' => $languages_data->languages_id,
 
-	
+                        'products_options_values_id' => $products_options_values_id,
 
-	//deleteproductimagemodal
+                    ]);
 
-	public function deleteproductimagemodal(Request $request){
+                }
 
-		
+            }
 
-		$products_id = $request->products_id;
 
-		$id = $request->id;
+            return redirect()->back()->withErrors([Lang::get("labels.valueshasbeenupdatedMessage")]);
 
-		
+        }
 
-		$result['data'] = array('products_id'=>$products_id, 'id'=>$id);
+    }
 
-		
 
-		return view("admin/deleteproductimagemodal")->with('result', $result);
+    //productsAttributes
 
-	}
+    public function attributes(Request $request)
+    {
 
-	
+        if (session('products_view') == 0) {
 
-	//deleteproductimage
+            print Lang::get("labels.You do not have to access this route");
 
-	public function deleteproductimage(Request $request){		
+        } else {
 
-		if(session('products_delete')==0){
 
-			return Lang::get("labels.You do not have to access this route");
+            $title = array('pageTitle' => Lang::get("labels.attributes"));
 
-		}else{
 
-		DB::table('products_images')->where([
+            //get function from other controller
 
-				'products_id'  	=>   $request->products_id,
+            $myVar = new AdminSiteSettingController();
 
-			 	'id'  			=> 	 $request->id			 
+            $extensions = $myVar->imageType();
 
-				])->delete();
 
-		
+            $attributes = DB::table('products_options')->get();
 
 
+            $result = array();
 
-		$products_images = DB::table('products_images')			
+            $index = 0;
 
-			->where('products_id','=', $request->products_id)
+            foreach ($attributes as $attributes_data) {
 
-			->orderBy('sort_order', 'ASC')
+                array_push($result, $attributes_data);
 
-			->get();		
 
-		
+                $languages = $myVar->getLanguages();
 
-		return($products_images);
 
-		}
+                $result2 = array();
 
-	}
+                $index2 = 0;
 
-	
+                foreach ($languages as $language) {
 
-	
+                    array_push($result2, $language);
 
-	//manageoptionsvalues
 
-	public function manageoptionsvalues(Request $request){
+                    $attributes = DB::table('products_options_descriptions')
+                        ->where('products_options_id', '=', $attributes_data->products_options_id)
+                        ->where('language_id', '=', $language->languages_id)
+                        ->get();
 
-		if(session('products_view')==0 ){
 
-			print Lang::get("labels.You do not have to access this route");
+                    $result2[$index2]->attributes = $attributes;
 
-		}else{
 
-			$title = array('pageTitle' => Lang::get("labels.Manage Values"));
+                    $values = DB::table('products_options_values')
+                        ->join('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id', '=', 'products_options_values.products_options_values_id')
+                        ->select('products_options_values_descriptions.*')
+                        ->where('language_id', '=', $language->languages_id)
+                        ->where('products_options_values.products_options_id', '=', $attributes_data->products_options_id)->get();
 
-			$data = array();
 
-			$myVar = new AdminSiteSettingController();			
+                    $result2[$index2]->values = $values;
 
-			$extensions = $myVar->imageType();
+                    $index2++;
 
-			$products_options_id = $request->id;
+                }
 
-			
 
-			$value = DB::table('products_options_values')->where('products_options_id',$products_options_id)->get();		
+                $result[$index]->data = $result2;
 
-			
+                $index++;
 
-			$result = array();							
+            }
 
-			$index = 0;
 
-			foreach($value as $values_data){				
+            return view("admin.attributes", $title)->with('result', $result);
 
-				array_push($result, $values_data);
+        }
 
-				$languages = $myVar->getLanguages();
+    }
 
-				
 
-				$result2 = array();
+    //common controller to show attributes
 
-				$index2 = 0;
+    public function displayattributes()
+    {
 
-				foreach($languages as $language){
 
-					array_push($result2, $language);
+        //get function from other controller
 
-					
+        $myVar = new AdminSiteSettingController();
 
-					$values = DB::table('products_options_values_descriptions')
+        $resutls['languages'] = $myVar->getLanguages();
 
-						->where('products_options_values_id','=',$values_data->products_options_values_id)
+        $defaultLanguage_id = $resutls['languages'][0]->languages_id;
 
-						->where('language_id','=',$language->languages_id)
 
-						->get();
+        foreach ($resutls['languages'] as $languages) {
 
-					
 
-					$result2[$index2]->values = $values;
+            if (!empty($languages->languages_id)) {
 
-					$index2++;
+                $language_id = $languages->languages_id;
 
-				}	
+            } else {
 
-			
+                $language_id = $defaultLanguage_id;
 
-				$result[$index]->data =$result2;
+            }
 
-				$index++;
 
-		}
+            $attributeOptions = DB::table('products_options')->where('products_options.language_id', '=', $language_id)->get();
 
-			$data['languages'] = $myVar->getLanguages();
+            $resutls['attributeOptions_' . $languages->languages_id] = $attributeOptions;
 
-			$data['content'] = $result;
+        }
 
-			$data['options'] = DB::table('products_options')
 
-							->join('products_options_descriptions','products_options_descriptions.products_options_id','=','products_options.products_options_id')
+        return $resutls;
 
-							->where('products_options.products_options_id',$products_options_id)->get();
 
-		
+    }
 
-		return view("admin.manageoptionsvalues",$title)->with('result', $data);
 
-					
+    //addoptions
 
-		}
+    public function addoptions(Request $request)
+    {
 
-	}
+        if (session('products_view') == 0) {
 
-	
+            print Lang::get("labels.You do not have to access this route");
 
-	//addnewoptions
+        } else {
 
-	public function addnewvalues(Request $request){
+            $title = array('pageTitle' => Lang::get("labels.AddOptions"));
 
-		if(session('products_create')==0 or session('products_update')==0){
 
-			print Lang::get("labels.You do not have to access this route");
+            $result = array();
 
-		}else{	
 
-				
+            //get function from other controller
 
-		$result = array();	
+            $myVar = new AdminSiteSettingController();
 
-		
+            $result['languages'] = $myVar->getLanguages();
 
-		//get function from other controller
 
-		$myVar = new AdminSiteSettingController();
+            return view("admin.addoptions", $title)->with('result', $result);
 
-		$languages = $myVar->getLanguages();	
+        }
 
-		
+    }
 
-		$i = 0;
 
-		//multiple lanugauge with record 
+    //addnewoptions
 
-		foreach($languages as $languages_data){
+    public function addnewoptions(Request $request)
+    {
 
-			$products_options_values_name = 'ValuesName_'.$languages_data->languages_id;
+        if (session('products_create') == 0 or session('products_update') == 0) {
 
-			
+            print Lang::get("labels.You do not have to access this route");
 
-			if($i==0){
+        } else {
 
-				$products_options_values_id = DB::table('products_options_values')->insertGetId([
 
-						'products_options_values_name'   =>	$request->$products_options_values_name,
+            $result = array();
 
-						'products_options_id'	  		 =>	$request->products_options_id
 
-						]);
+            //get function from other controller
 
-				$i++;
+            $myVar = new AdminSiteSettingController();
 
-			}
+            $languages = $myVar->getLanguages();
 
-			
 
-			DB::table('products_options_values_descriptions')->insert([
+            $i = 0;
 
-					'options_values_name'   		 =>   $request->$products_options_values_name,
+            //multiple lanugauge with record
 
-					'products_options_values_id'     =>   $products_options_values_id,
+            foreach ($languages as $languages_data) {
 
-					'language_id'       	  		 =>   $languages_data->languages_id
+                $OptionsName = 'OptionsName_' . $languages_data->languages_id;
 
-				]);
 
-		}	
+                if ($i == 0) {
 
-				
+                    $products_options_id = DB::table('products_options')->insertGetId([
 
-		return redirect()->back()->withErrors([Lang::get("labels.ValuesAddedMessage")]);
+                        'products_options_name' => $request->$OptionsName,
 
-		}		
+                    ]);
 
-	}
+                    $i++;
 
-	
+                }
 
-	//editvalues
 
-	public function editvalues(Request $request){
+                DB::table('products_options_descriptions')->insert([
 
-		if(session('products_create')==0){
+                    'options_name' => $request->$OptionsName,
 
-			print Lang::get("labels.You do not have to access this route");
+                    'products_options_id' => $products_options_id,
 
-		}else{
+                    'language_id' => $languages_data->languages_id
 
-			$title = array('pageTitle' => Lang::get("labels.Manage Options"));
+                ]);
 
-		
+            }
 
-		$myVar = new AdminSiteSettingController();
 
-		$result['languages'] = $myVar->getLanguages();
+            return redirect()->back()->withErrors([Lang::get("labels.OptionsAddedMessage")]);
 
-		
+        }
 
-		$edit = DB::table('products_options_values')->where('products_options_values_id', $request->id)->get();
+    }
 
-		
 
-		$description_data = array();		
+    //manageoptions
 
-		foreach($result['languages'] as $languages_data){
+    public function manageoptions(Request $request)
+    {
 
-			
+        if (session('products_view') == 0) {
 
-			$description = DB::table('products_options_values_descriptions')->where([
+            print Lang::get("labels.You do not have to access this route");
 
-					['language_id', '=', $languages_data->languages_id],
+        } else {
 
-					['products_options_values_id', '=', $request->id],
 
-				])->get();
+            $title = array('pageTitle' => Lang::get("labels.Manage Options"));
 
-				
 
-			if(count($description)>0){								
+            $myVar = new AdminSiteSettingController();
 
-				$description_data[$languages_data->languages_id]['name'] = $description[0]->options_values_name;
+            $result['languages'] = $myVar->getLanguages();
 
-				$description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
 
-				$description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;										
+            $editoptions = DB::table('products_options')->where('products_options_id', $request->id)->get();
 
-			}else{
 
-				$description_data[$languages_data->languages_id]['name'] = '';
+            $description_data = array();
 
-				$description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
+            foreach ($result['languages'] as $languages_data) {
 
-				$description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;	
 
-			}
+                $description = DB::table('products_options_descriptions')->where([
 
-		}
+                    ['language_id', '=', $languages_data->languages_id],
 
-		
+                    ['products_options_id', '=', $request->id],
 
-		$result['description'] = $description_data;	
+                ])->get();
 
-		$result['editoptions'] = $edit;
 
-				
+                if (count($description) > 0) {
 
-		return view("admin.editvalues",$title)->with('result', $result);
+                    $description_data[$languages_data->languages_id]['name'] = $description[0]->options_name;
 
-		}
+                    $description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
 
-	}
+                    $description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;
 
-	
+                } else {
 
-	//updateoptions
+                    $description_data[$languages_data->languages_id]['name'] = '';
 
-	public function updatevalue(Request $request){
+                    $description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
 
-		if(session('products_update')==0){
+                    $description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;
 
-			print Lang::get("labels.You do not have to access this route");
+                }
 
-		}else{	
+            }
 
-				
 
-		$products_options_values_id = $request->products_options_values_id;
+            $result['description'] = $description_data;
 
-		
+            $result['editoptions'] = $editoptions;
 
-		$myVar = new AdminSiteSettingController();
 
-		$languages = $myVar->getLanguages();
+            return view("admin.manageoptions", $title)->with('result', $result);
 
-		
 
-		foreach($languages as $languages_data){
+        }
 
-			$options_values_name = 'options_values_name_'.$languages_data->languages_id;
+    }
 
-			
 
-			$checkExist = DB::table('products_options_values_descriptions')->where('products_options_values_id','=',$products_options_values_id)->where('language_id','=',$languages_data->languages_id)->get();			
+    //updateoptions
 
-			if(count($checkExist)>0){
+    public function updateoptions(Request $request)
+    {
 
-				DB::table('products_options_values_descriptions')->where('products_options_values_id','=',$products_options_values_id)->where('language_id','=',$languages_data->languages_id)->update([
+        if (session('products_update') == 0) {
 
-					'options_values_name'  	    		 =>   $request->$options_values_name,
+            print Lang::get("labels.You do not have to access this route");
 
-					]);
+        } else {
 
-			}else{
 
-				DB::table('products_options_values_descriptions')->insert([
+            $products_options_id = $request->products_options_id;
 
-					'options_values_name'  	    		 =>   $request->$options_values_name,
 
-					'language_id'						 =>   $languages_data->languages_id,
+            $myVar = new AdminSiteSettingController();
 
-					'products_options_values_id'		 =>   $products_options_values_id,
+            $languages = $myVar->getLanguages();
 
-					]);
 
-			}
+            foreach ($languages as $languages_data) {
 
-		}
+                $options_name = 'options_name_' . $languages_data->languages_id;
 
-				
 
-		return redirect()->back()->withErrors([Lang::get("labels.valueshasbeenupdatedMessage")]);
+                $checkExist = DB::table('products_options_descriptions')->where('products_options_id', '=', $products_options_id)->where('language_id', '=', $languages_data->languages_id)->get();
 
-		}
+                if (count($checkExist) > 0) {
 
-	}
+                    DB::table('products_options_descriptions')->where('products_options_id', '=', $products_options_id)->where('language_id', '=', $languages_data->languages_id)->update([
 
-	
+                        'options_name' => $request->$options_name,
 
-	//productsAttributes
+                    ]);
 
-	public function attributes(Request $request){
+                } else {
 
-		if(session('products_view')==0){
+                    DB::table('products_options_descriptions')->insert([
 
-			print Lang::get("labels.You do not have to access this route");
+                        'options_name' => $request->$options_name,
 
-		}else{
+                        'language_id' => $languages_data->languages_id,
 
-			
+                        'products_options_id' => $products_options_id,
 
-		$title = array('pageTitle' => Lang::get("labels.attributes"));
+                    ]);
 
-		
+                }
 
-		//get function from other controller
+            }
 
-		$myVar = new AdminSiteSettingController();			
 
-		$extensions = $myVar->imageType();
+            return redirect()->back()->withErrors([Lang::get("labels.optionhasbeenupdatedMessage")]);
 
-				
+        }
 
-		$attributes = DB::table('products_options')->get();		
+    }
 
-		
 
-		$result = array();		
+    //addattributevalue
+    public function addattributevalue(Request $request)
+    {
 
-		$index = 0;
+        if (session('products_view') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
 
-		foreach($attributes as $attributes_data){	
+            $attributes   = array();
+            $message      = array();
+            $errorMessage = array();
 
-			array_push($result, $attributes_data);
+            //add value
+            $products_options_values_id = DB::table('products_options_values')->insertGetId([
+                'products_options_values_name' => $request->products_options_values_name,
+                'language_id'                  => $request->language_id,
+            ]);
 
-			
-
-			$languages = $myVar->getLanguages();
-
-			
-
-			$result2 = array();
-
-			$index2 = 0;
-
-			foreach($languages as $language){
-
-				array_push($result2, $language);
-
-				
-
-				$attributes = DB::table('products_options_descriptions')
-
-					->where('products_options_id','=',$attributes_data->products_options_id)
-
-					->where('language_id','=',$language->languages_id)
-
-					->get();
-
-				
-
-				$result2[$index2]->attributes = $attributes;
-
-				
-
-				$values = DB::table('products_options_values')
-
-					->join('products_options_values_descriptions', 'products_options_values_descriptions.products_options_values_id','=', 'products_options_values.products_options_values_id')
-
-					->select('products_options_values_descriptions.*')
-
-					->where('language_id','=',$language->languages_id)
-
-					->where('products_options_values.products_options_id','=',$attributes_data->products_options_id)->get();
-
-				
-
-				$result2[$index2]->values =$values;	
-
-				$index2++;	
-
-			}	
-
-		
-
-			$result[$index]->data =$result2;
-
-			$index++;
-
-		}
-
-			
-
-		return view("admin.attributes",$title)->with('result', $result);
-
-		}
-
-	}
-
-	
-
-	//common controller to show attributes
-
-	public function displayattributes(){
-
-		
-
-		//get function from other controller
-
-		$myVar = new AdminSiteSettingController();
-
-		$resutls['languages'] = $myVar->getLanguages();
-
-		$defaultLanguage_id = $resutls['languages'][0]->languages_id;
-
-		
-
-		foreach($resutls['languages'] as $languages){
-
-			
-
-			if(!empty($languages->languages_id)){
-
-				$language_id = $languages->languages_id;
-
-			}else{
-
-				$language_id = $defaultLanguage_id;
-
-			}
-
-			
-
-			$attributeOptions = DB::table('products_options')->where('products_options.language_id','=', $language_id)->get();
-
-			$resutls['attributeOptions_'.$languages->languages_id] = $attributeOptions;
-
-		}
-
-		
-
-		return $resutls;
-
-		
-
-	}
-
-	
-
-	
-
-	//addoptions
-
-	public function addoptions(Request $request){
-
-		if(session('products_view')==0){
-
-			print Lang::get("labels.You do not have to access this route");
-
-		}else{			
-
-			$title = array('pageTitle' => Lang::get("labels.AddOptions"));
-
-			
-
-			$result = array();
-
-			
-
-			//get function from other controller
-
-			$myVar = new AdminSiteSettingController();
-
-			$result['languages'] = $myVar->getLanguages();
-
-			
-
-			return view("admin.addoptions",$title)->with('result', $result);
-
-		}
-
-	}
-
-	
-
-	//addnewoptions
-
-	public function addnewoptions(Request $request){
-
-		if(session('products_create')==0 or session('products_update')==0){
-
-			print Lang::get("labels.You do not have to access this route");
-
-		}else{	
-
-				
-
-		$result = array();	
-
-		
-
-		//get function from other controller
-
-		$myVar = new AdminSiteSettingController();
-
-		$languages = $myVar->getLanguages();	
-
-		
-
-		$i = 0;
-
-		//multiple lanugauge with record 
-
-		foreach($languages as $languages_data){
-
-			$OptionsName = 'OptionsName_'.$languages_data->languages_id;
-
-			
-
-			if($i==0){
-
-				$products_options_id = DB::table('products_options')->insertGetId([
-
-						'products_options_name'   =>   $request->$OptionsName,
-
-						]);
-
-				$i++;
-
-			}
-
-			
-
-			DB::table('products_options_descriptions')->insert([
-
-					'options_name'   		  =>   $request->$OptionsName,
-
-					'products_options_id'     =>   $products_options_id,
-
-					'language_id'       	  =>   $languages_data->languages_id
-
-				]);
-
-		}	
-
-				
-
-		return redirect()->back()->withErrors([Lang::get("labels.OptionsAddedMessage")]);
-
-		}		
-
-	}
-
-		
-
-	//manageoptions
-
-	public function manageoptions(Request $request){		
-
-		if(session('products_view')==0 ){
-
-			print Lang::get("labels.You do not have to access this route");
-
-		}else{	
-
-		
-
-		$title = array('pageTitle' => Lang::get("labels.Manage Options"));
-
-		
-
-		$myVar = new AdminSiteSettingController();
-
-		$result['languages'] = $myVar->getLanguages();
-
-		
-
-		$editoptions = DB::table('products_options')->where('products_options_id', $request->id)->get();
-
-		
-
-		$description_data = array();		
-
-		foreach($result['languages'] as $languages_data){
-
-			
-
-			$description = DB::table('products_options_descriptions')->where([
-
-					['language_id', '=', $languages_data->languages_id],
-
-					['products_options_id', '=', $request->id],
-
-				])->get();
-
-				
-
-			if(count($description)>0){								
-
-				$description_data[$languages_data->languages_id]['name'] = $description[0]->options_name;
-
-				$description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
-
-				$description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;										
-
-			}else{
-
-				$description_data[$languages_data->languages_id]['name'] = '';
-
-				$description_data[$languages_data->languages_id]['language_name'] = $languages_data->name;
-
-				$description_data[$languages_data->languages_id]['languages_id'] = $languages_data->languages_id;	
-
-			}
-
-		}
-
-		
-
-		$result['description'] = $description_data;	
-
-		$result['editoptions'] = $editoptions;
-
-		
-
-		return view("admin.manageoptions",$title)->with('result', $result);
-
-		
-
-		}
-
-	}
-
-	
-
-	
-
-	//updateoptions
-
-	public function updateoptions(Request $request){
-
-		if(session('products_update')==0){
-
-			print Lang::get("labels.You do not have to access this route");
-
-		}else{	
-
-				
-
-		$products_options_id = $request->products_options_id;
-
-		
-
-		$myVar = new AdminSiteSettingController();
-
-		$languages = $myVar->getLanguages();
-
-		
-
-		foreach($languages as $languages_data){
-
-			$options_name = 'options_name_'.$languages_data->languages_id;
-
-			
-
-			$checkExist = DB::table('products_options_descriptions')->where('products_options_id','=',$products_options_id)->where('language_id','=',$languages_data->languages_id)->get();			
-
-			if(count($checkExist)>0){
-
-				DB::table('products_options_descriptions')->where('products_options_id','=',$products_options_id)->where('language_id','=',$languages_data->languages_id)->update([
-
-					'options_name'  	    		 =>   $request->$options_name,
-
-					]);
-
-			}else{
-
-				DB::table('products_options_descriptions')->insert([
-
-					'options_name'  	     =>   $request->$options_name,
-
-					'language_id'			 =>   $languages_data->languages_id,
-
-					'products_options_id'	 =>   $products_options_id,
-
-					]);
-
-			}
-
-		}
-
-				
-
-		return redirect()->back()->withErrors([Lang::get("labels.optionhasbeenupdatedMessage")]);
-
-		}
-
-	}
-
-	
-
-	//addattributevalue
-	public function addattributevalue(Request $request){
-		
-		if(session('products_view')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{	
-				
-			$attributes = array();	
-			$message = array();
-			$errorMessage = array();	
-			
-			//add value
-			$products_options_values_id = DB::table('products_options_values')->insertGetId([
-							'products_options_values_name'  =>   $request->products_options_values_name,
-							'language_id'			 		=>   $request->language_id,
-							]);
-									
-			/*DB::table('products_options_values_to_products_options')->insertGetId([
+            /*DB::table('products_options_values_to_products_options')->insertGetId([
 							'products_options_id'  				=>   $request->products_options_id,
 							'products_options_values_id'		=>   $products_options_values_id,
 							]);*/
-			
-			
-			/*$attributes = DB::table('products_options_values_to_products_options')
+
+
+            /*$attributes = DB::table('products_options_values_to_products_options')
 				->leftJoin('products_options_values', 'products_options_values.products_options_values_id','=', 'products_options_values_to_products_options.products_options_values_id')
 				->where('products_options_values_to_products_options.products_options_id','=',$request->products_options_id)->where('products_options_values.language_id','=',$request->language_id)->get();*/
-				
-			return view("admin.attributesTable")->with('attributes', $attributes);
-		}
-	}
 
-	
+            return view("admin.attributesTable")->with('attributes', $attributes);
+        }
+    }
 
-	//updateattributevalue
 
-	public function updateattributevalue(Request $request){
-		if(session('products_update')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{	
-		
-		$attributes = array();	
-		$message = array();
-		$errorMessage = array();	
-								
-		DB::table('products_options_values')
-			->where('products_options_values_id','=',$request->products_options_values_id)
-			->update(['products_options_values_name' =>  $request->products_options_values_name]);
-			
-		/*$attributes = DB::table('products_options_values_to_products_options')
+    //updateattributevalue
+
+    public function updateattributevalue(Request $request)
+    {
+        if (session('products_update') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
+
+            $attributes   = array();
+            $message      = array();
+            $errorMessage = array();
+
+            DB::table('products_options_values')
+                ->where('products_options_values_id', '=', $request->products_options_values_id)
+                ->update(['products_options_values_name' => $request->products_options_values_name]);
+
+            /*$attributes = DB::table('products_options_values_to_products_options')
 			->leftJoin('products_options_values', 'products_options_values.products_options_values_id','=', 'products_options_values_to_products_options.products_options_values_id')
 			->where('products_options_values_to_products_options.products_options_id','=',$request->products_options_id)->where('products_options_values.language_id','=',$request->language_id)->get();*/
-			
-		//attributesTable
-		return view("admin.attributesTable")->with('attributes', $attributes);
-		}
-	}
 
-	
+            //attributesTable
+            return view("admin.attributesTable")->with('attributes', $attributes);
+        }
+    }
 
-	//check association of attribute with products
 
-	public function checkattributeassociate(Request $request){
+    //check association of attribute with products
 
-		$option_id = $request->option_id;
+    public function checkattributeassociate(Request $request)
+    {
 
-		$products = DB::table('products_attributes')
+        $option_id = $request->option_id;
 
-				->join('products','products.products_id','=','products_attributes.products_id')
+        $products = DB::table('products_attributes')
+            ->join('products', 'products.products_id', '=', 'products_attributes.products_id')
+            ->join('products_description', 'products_description.products_id', '=', 'products.products_id')
+            ->where('options_id', '=', $option_id)
+            ->groupBy('products_attributes.products_id')
+            ->get();
 
-				->join('products_description','products_description.products_id','=','products.products_id')
 
-				->where('options_id','=',$option_id)
+        if (count($products) > 0) {
 
-				->groupBy('products_attributes.products_id')
+            foreach ($products as $products_data) {
 
-				->get();
+                print ("<li style='display:inline-block; width: 30%'>" . $products_data->products_name . "</li>");
 
-				
+            }
 
-		if(count($products)>0){
+        } else {
 
-			foreach($products as $products_data){
+        }
 
-				print ("<li style='display:inline-block; width: 30%'>".$products_data->products_name."</li>");
+    }
 
-			}
 
-		}else{
+    //deleteattribute
 
-		}
+    public function deleteattribute(Request $request)
+    {
+        if (session('products_delete') == 0) {
+            print Lang::get("labels.You do not have to access this route");
+        } else {
 
-	}
+            $option_id = $request->option_id;
+            DB::table('products_options')->where('products_options_id', '=', $option_id)->delete();
+            DB::table('products_options_descriptions')->where('products_options_id', '=', $option_id)->delete();
 
-	
+            $values = DB::table('products_options_values')->where('products_options_id', '=', $option_id)->get();
+            foreach ($values as $value) {
+                DB::table('products_options_values_descriptions')->where('products_options_values_id', '=', $value->products_options_values_id)->delete();
+            }
+            DB::table('products_options_values')->where('products_options_id', '=', $option_id)->delete();
 
-	//deleteattribute
+            return redirect()->back()->withErrors([Lang::get("labels.OptionhasbeendeletedMessage")]);
+        }
+    }
 
-	public function deleteattribute(Request $request){
-		if(session('products_delete')==0){
-			print Lang::get("labels.You do not have to access this route");
-		}else{	
-		
-		$option_id = $request->option_id;
-		DB::table('products_options')->where('products_options_id','=',$option_id)->delete();
-		DB::table('products_options_descriptions')->where('products_options_id','=',$option_id)->delete();
-		
-		$values = DB::table('products_options_values')->where('products_options_id','=',$option_id)->get();
-		foreach($values as $value){
-			DB::table('products_options_values_descriptions')->where('products_options_values_id','=',$value->products_options_values_id)->delete();
-		}
-		DB::table('products_options_values')->where('products_options_id','=',$option_id)->delete();
-		
-		return redirect()->back()->withErrors([Lang::get("labels.OptionhasbeendeletedMessage")]);
-		}
-	}
 
-	
+    //check association of attribute/option value with products
+    public function checkvalueassociate(Request $request)
+    {
 
-	//check association of attribute/option value with products
-	public function checkvalueassociate(Request $request){
+        $value_id = $request->value_id;
 
-		$value_id = $request->value_id;
+        $products = DB::table('products_attributes')
+            ->join('products', 'products.products_id', '=', 'products_attributes.products_id')
+            ->join('products_description', 'products_description.products_id', '=', 'products.products_id')
+            ->where('options_values_id', '=', $value_id)
+            ->get();
 
-		$products = DB::table('products_attributes')
-				->join('products','products.products_id','=','products_attributes.products_id')
+        if (count($products) > 0) {
+            foreach ($products as $products_data) {
+                print ("<li style='display:inline-block; width: 30%'>" . $products_data->products_name . "</li>");
 
-				->join('products_description','products_description.products_id','=','products.products_id')
+            }
+        }
 
-				->where('options_values_id','=',$value_id)
+    }
 
-				->get();
 
-		if(count($products)>0){
-			foreach($products as $products_data){
-				print ("<li style='display:inline-block; width: 30%'>".$products_data->products_name."</li>");
+    //deleteattributeValue
 
-			}
-		}
+    public function deletevalue(Request $request)
+    {
+        if (session('products_delete') == 0) {
 
-	}
+            print Lang::get("labels.You do not have to access this route");
+        } else {
 
-	
+            $value_id = $request->value_id;
+            DB::table('products_options_values')->where('products_options_values_id', '=', $value_id)->delete();
+            DB::table('products_options_values_descriptions')->where('products_options_values_id', '=', $value_id)->delete();
 
-	//deleteattributeValue
+            return redirect()->back()->withErrors([Lang::get("labels.ValueshasbeendeletedMessage")]);
 
-	public function deletevalue(Request $request){
-		if(session('products_delete')==0){
+        }
 
-			print Lang::get("labels.You do not have to access this route");
-		}else{	
-
-			$value_id = $request->value_id;
-			DB::table('products_options_values')->where('products_options_values_id','=',$value_id)->delete();
-			DB::table('products_options_values_descriptions')->where('products_options_values_id','=',$value_id)->delete();			
-
-			return redirect()->back()->withErrors([Lang::get("labels.ValueshasbeendeletedMessage")]);
-
-		}
-
-	}
+    }
 }

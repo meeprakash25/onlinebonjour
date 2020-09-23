@@ -286,7 +286,7 @@
                                 <div class="form-group">
                                   <label for="name" class="col-sm-2 col-md-3 control-label">Amount After Discount </label>
                                   <div class="col-sm-10 col-md-4">
-                                    {!! Form::text('discount_price',  '', array('class'=>'form-control discount-validate', 'id'=>'discount_price')) !!}
+                                    {!! Form::text('discount_price',  '', array('class'=>'form-control', 'id'=>'discount_price')) !!}
                                     <span class="help-block" style="font-weight: normal;font-size: 11px;margin-bottom: 0;">
                                     {{ trans('labels.ProductPriceText') }}
                                     </span>
@@ -438,4 +438,4 @@
 
     });
 </script>
-@endsection 
+@endsection
