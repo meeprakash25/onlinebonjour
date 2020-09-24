@@ -20,7 +20,6 @@
         	<div class="row">
                 <div class="col-12 col-md-6 col-lg-8">
                 	<p>
-                    @lang('website.Dummy Text')</p>
                      @if(session()->has('success') )
                         <div class="alert alert-success">
                             {{ session()->get('success') }}
@@ -29,17 +28,17 @@
                     <form name="signup" class="form-validate" enctype="multipart/form-data" action="{{ URL::to('/processContactUs')}}" method="post">
                         <div class="form-group">
                             <label for="firstName">@lang('website.Full Name')</label>
-                            <input type="text" class="form-control field-validate" id="name" name="name">
+                            <input type="text" class="form-control field-validate" id="name" name="name" required>
 							<span class="help-block error-content" hidden>@lang('website.Please enter your name')</span>
                         </div>
                         <div class="form-group">
                             <label for="inputEmail4" class="col-form-label">@lang('website.Email')</label>
-                            <input type="email" class="form-control email-validate" id="inputEmail4" name="email">
+                            <input type="email" class="form-control email-validate" id="inputEmail4" name="email" required>
 							<span class="help-block error-content" hidden>@lang('website.Please enter your valid email address')</span>
                         </div>
                         <div class="form-group">
                             <label for="subject" class="col-form-label">@lang('website.Message')</label>
-                            <textarea type="text" class="form-control field-validate" id="message" rows="5" name="message"></textarea>
+                            <textarea type="text" class="form-control field-validate" id="message" rows="5" name="message" required></textarea>
 							<span class="help-block error-content" hidden>@lang('website.Please enter your message')</span>
                         </div>
                         <div class="button">
