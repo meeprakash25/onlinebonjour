@@ -162,23 +162,23 @@
                     </div>
 				</form>
 			</div>
-			<div class="col-12 col-md-6 col-lg-5 new-customers">
-					<ul>
-						<li>@lang('website.Lorem ipsum dolor sit amet, consectetur adipiscing elit')</li>
-						<li>@lang('website.Duis at nisl luctus, malesuada diam non, mattis odio')</li>
-						<li>@lang('website.Fusce porta neque at enim consequat, in vulputate tellus faucibus')</li>
-						<br>
-						<li>@lang('website.Pellentesque suscipit tortor id dui accumsan varius')</li>
-						<li>@lang('website.Sed interdum purus imperdiet tortor imperdiet, et ultricies leo gravida')</li>
-						<li>@lang('website.Aliquam pharetra urna vel nulla egestas, non laoreet mauris mollis')</li>
-						<li>@lang('website.Integer sed velit sit amet quam pharetra ullamcorper')</li>
-						<br>
-						<li>@lang('website.Proin eget nulla accumsan, finibus lacus aliquam, tincidunt turpis')</li>
-						<li>@lang('website.Nam at orci tempor, mollis mi ornare, accumsan risus')</li>
-						<li>@lang('website.Cras vel ante vel augue convallis posuere')</li>
-						<li>@lang('website.Ut quis dolor accumsan, viverra neque nec, blandit leo')</li>
-					</ul>	
-			</div>
+{{--			<div class="col-12 col-md-6 col-lg-5 new-customers">--}}
+{{--					<ul>--}}
+{{--						<li>@lang('website.Lorem ipsum dolor sit amet, consectetur adipiscing elit')</li>--}}
+{{--						<li>@lang('website.Duis at nisl luctus, malesuada diam non, mattis odio')</li>--}}
+{{--						<li>@lang('website.Fusce porta neque at enim consequat, in vulputate tellus faucibus')</li>--}}
+{{--						<br>--}}
+{{--						<li>@lang('website.Pellentesque suscipit tortor id dui accumsan varius')</li>--}}
+{{--						<li>@lang('website.Sed interdum purus imperdiet tortor imperdiet, et ultricies leo gravida')</li>--}}
+{{--						<li>@lang('website.Aliquam pharetra urna vel nulla egestas, non laoreet mauris mollis')</li>--}}
+{{--						<li>@lang('website.Integer sed velit sit amet quam pharetra ullamcorper')</li>--}}
+{{--						<br>--}}
+{{--						<li>@lang('website.Proin eget nulla accumsan, finibus lacus aliquam, tincidunt turpis')</li>--}}
+{{--						<li>@lang('website.Nam at orci tempor, mollis mi ornare, accumsan risus')</li>--}}
+{{--						<li>@lang('website.Cras vel ante vel augue convallis posuere')</li>--}}
+{{--						<li>@lang('website.Ut quis dolor accumsan, viverra neque nec, blandit leo')</li>--}}
+{{--					</ul>--}}
+{{--			</div>--}}
 		</div>
 	</div>		
 	</div>
