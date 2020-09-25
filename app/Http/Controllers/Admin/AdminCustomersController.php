@@ -49,7 +49,7 @@ class AdminCustomersController extends Controller
 			->LeftJoin('zones','zones.zone_id','=', 'address_book.entry_zone_id')
 			->LeftJoin('customers_info','customers_info.customers_info_id','=', 'customers.customers_id')
 			->select('customers.*', 'address_book.entry_gender as entry_gender', 'address_book.entry_company as entry_company', 'address_book.entry_firstname as entry_firstname', 'address_book.entry_lastname as entry_lastname', 'address_book.entry_street_address as entry_street_address', 'address_book.entry_suburb as entry_suburb', 'address_book.entry_postcode as entry_postcode', 'address_book.entry_city as entry_city', 'address_book.entry_state as entry_state', 'countries.*', 'zones.*')
-			->orderBy('customers.customers_id','ASC')
+			->orderBy('customers.customers_id','DESC')
 			->paginate(50);
 			
 		$result = array();

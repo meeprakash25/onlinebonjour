@@ -66,7 +66,7 @@
                                      @endforeach
                                      @else
                                      	<tr>
-                                          <td valign="center">@lang('website.Shipping addresses are not added yet')</td>
+                                          <td colspan="3" class="text-center">@lang('website.Shipping addresses are not added yet')</td>
                                         </tr>
                                      @endif
                                       </tbody>

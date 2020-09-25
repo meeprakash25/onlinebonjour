@@ -29,18 +29,19 @@
 
                                 @if (Auth::guard('customer')->check())
                                     <li class="nav-item">
-                                        <div class="nav-link">
-                                            <span class="p-pic"><img src="{{asset('').auth()->guard('customer')->user()->customers_picture}}" alt="image"></span>@lang('website.Welcome')
-                                            &nbsp;{{ auth()->guard('customer')->user()->customers_firstname }}
-                                            &nbsp;{{ auth()->guard('customer')->user()->customers_lastname }}!
-                                        </div>
+                                        <a class="nav-link">
+                                            <span class="p-pic">
+                                                <img src="{{asset('').auth()->guard('customer')->user()->customers_picture}}" alt="image">
+                                            </span>@lang('website.Welcome') &nbsp;
+                                            <a href="{{ URL::to('/profile')}}" class="nav-item">
+                                                 {{ auth()->guard('customer')->user()->customers_firstname }}
+                                                &nbsp;{{ auth()->guard('customer')->user()->customers_lastname }}
+                                            </a>
+                                        </a>
                                     </li>
-                                    <li class="nav-item"><a href="{{ URL::to('/profile')}}" class="nav-link -before">@lang('website.Profile')</a></li>
                                     <li class="nav-item"><a href="{{ URL::to('/wishlist')}}" class="nav-link -before">@lang('website.Wishlist')</a></li>
                                     <li class="nav-item"><a href="{{ URL::to('/orders')}}" class="nav-link -before">@lang('website.Orders')</a></li>
-
-                                    <li class="nav-item"><a href="{{ URL::to('/shipping-address')}}"
-                                                            class="nav-link -before">@lang('website.Shipping Address')</a></li>
+                                    <li class="nav-item"><a href="{{ URL::to('/shipping-address')}}" class="nav-link -before">@lang('website.Shipping Address')</a></li>
                                     <li class="nav-item"><a href="{{ URL::to('/logout')}}" class="nav-link -before">@lang('website.Logout')</a></li>
                                 @else
                                     <li class="nav-item">
@@ -97,20 +98,9 @@
                 </div>
                 <div class="col-12 col-sm-5 col-md-4 col-lg-3 spaceleft-0">
                     <ul class="top-right-list">
-                    <!--<li class="phone-header">
-                            <a>
-                                <img class="img-fluid" src="{{asset('').'public/images/phone.png'}}" alt="icon">
-                                <span class="block">
-                                    <span class="title">@lang('website.Call Us Free'):</span>
-                                    <span class="items">888 9436 6000</span>
-                                </span>
-                            </a>
-                        </li>-->
                         <li class="wishlist-header">
                             <a href="{{ URL::to('/wishlist')}}">
                                 <span class="badge badge-secondary" id="wishlist-count">{{$result['commonContent']['totalWishList']}}</span>
-                            <!--<img class="img-fluid" src="{{asset('').'public/images/wishlist_bag.png'}}" alt="icon">-->
-
                                 <span class="fa-stack fa-lg">
                                   <i class="fa fa-shopping-bag fa-stack-2x"></i>
                                   <i class="fa fa-heart fa-stack-2x"></i>
@@ -168,27 +158,8 @@
                                         @endforeach
                                     </ul>
                                 </li>
-                            <!--<li class="nav-item dropdown open">
-                                <a href="" class="nav-link dropdown-toggle" id="navbarDropdownMenuLink01" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">@lang('website.homePages')</a>
-                                <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink01">
-                                    <li> <a class="dropdown-item" href="{{ URL::to('/setStyle?style=one')}}" >@lang('website.homePage1')</a> </li>
-                                    <li> <a class="dropdown-item" href="{{ URL::to('/setStyle?style=two')}}">@lang('website.homePage2')</a> </li>
-                                    <li> <a class="dropdown-item" href="{{ URL::to('/setStyle?style=three')}}">@lang('website.homePage3')</a> </li>
-                                </ul>
-                            </li>-->
                                 <li class="nav-item"><a class="nav-link" href="{{ URL::to('/shop')}}">@lang('website.Shop')</a></li>
                                 <li class="nav-item"><a class="nav-link" href="{{ URL::to('/brands')}}">Brands</a></li>
-                            <!-- <li class="nav-item dropdown open">
-                                <a class="nav-link dropdown-toggle" href="{{ URL::to('/news/')}}">@lang('website.News')</a>
-                    
-                                <ul class="dropdown-menu" > 
-                                @foreach($result['commonContent']['newsCategories'] as $categories)
-                                <li>
-                                    <a class="dropdown-item" href="{{ URL::to('/news?category='.$categories->slug)}}">{{$categories->name}}</a>
-                                    </li>
-                                @endforeach
-                                    </ul>
-                                </li> -->
                                 <li class="nav-item"><a class="nav-link" href="{{ URL::to('/contact-us')}}">@lang('website.Contact Us')</a></li>
                                 <li class="nav-item dropdown open">
                                     <a href="" class="nav-link dropdown-toggle" id="navbarDropdownMenuLink02" data-toggle="dropdown" aria-haspopup="true"
@@ -217,16 +188,7 @@
 
                             <ul class="navbar-nav">
                                 <li class="nav-item first"><a href="{{ URL::to('/')}}" class="nav-link"><i class="fa fa-home"></i></a></li>
-                            <!--
-                            <li class="nav-item dropdown open">
-                                <div class="nav-link dropdown-toggle">@lang('website.homePages')</div>
-                                <ul class="dropdown-menu" >
-                                    <li> <a class="dropdown-item" href="{{ URL::to('/setStyle?style=one')}}" >@lang('website.homePage1')</a> </li>
-                                    <li> <a class="dropdown-item" href="{{ URL::to('/setStyle?style=two')}}">@lang('website.homePage2')</a> </li>
-                                    <li> <a class="dropdown-item" href="{{ URL::to('/setStyle?style=three')}}">@lang('website.homePage3')</a> </li>
-                                </ul>
-                            </li>
--->
+
                                 <li class="nav-item"><a class="nav-link" href="{{ URL::to('/shop')}}">@lang('website.Shop')</a></li>
 
                                 <li class="nav-item dropdown mega-dropdown open">
@@ -245,9 +207,10 @@
                                                         <div class="carousel-inner">
 
                                                             @foreach($result['commonContent']['recentProducts']['product_data'] as $key=>$products)
-                                                                <div class="carousel-item @if($key==0) active @endif"><a href="{{ URL::to('/product-detail/'.$products->products_slug)}}"
-                                        ><img src="{{asset('').$products->products_image}}"
-                                                                                              alt="{{$products->products_name}}"></a>
+                                                                <div class="carousel-item @if($key==0) active @endif">
+                                                                    <a href="{{ URL::to('/product-detail/'.$products->products_slug)}}">
+                                                                        <img src="{{asset('').$products->products_image}}"
+                                                                             alt="{{$products->products_name}}"></a>
                                                                     <small>@foreach($products->categories as $key=>$category)
                                                                             {{$category->categories_name}}@if(++$key === count($products->categories)) @else
                                                                                 , @endif
@@ -255,14 +218,14 @@
                                                                     <h5>{{$products->products_name}}</h5>
 
                                                                     <div class="block">
-                                                    <span class="price">
-                                                        @if(!empty($products->discount_price))
-                                                            <span class="line-through">{{$web_setting[19]->value}}{{$products->discount_price+0}}</span>
-                                                            {{$web_setting[19]->value}}{{$products->products_price+0}}
-                                                        @else
-                                                            {{$web_setting[19]->value}}{{$products->products_price+0}}
-                                                        @endif
-                                                    </span>
+                                                                        <span class="price">
+                                                                            @if(!empty($products->discount_price))
+                                                                                <span class="line-through">{{$web_setting[19]->value}}{{$products->discount_price+0}}</span>
+                                                                                {{$web_setting[19]->value}}{{$products->products_price+0}}
+                                                                            @else
+                                                                                {{$web_setting[19]->value}}{{$products->products_price+0}}
+                                                                            @endif
+                                                                        </span>
 
                                                                         <div class="buttons">
                                                                             <button class="btn btn-secondary cart"

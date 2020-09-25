@@ -10,8 +10,7 @@
                                 , {{$result['commonContent']['setting'][7]->value}} {{$result['commonContent']['setting'][8]->value}}</span></li>
                         <li><i class="fa fa-phone"></i><span>{{$result['commonContent']['setting'][11]->value}}</span></li>
                         <li><i class="fa fa-envelope"></i><span> <a
-                                        href="mailto:info@onlinebonjour.com">{{$result['commonContent']['setting'][3]->value}}</a> </span></li>
-
+                                        href="mailto:{{$result['commonContent']['setting'][3]->value}}">{{$result['commonContent']['setting'][3]->value}}</a> </span></li>
                     </ul>
                 </div>
             </div>
@@ -64,25 +63,26 @@
                     <div class="socials">
                         <h5>@lang('website.Follow Us')</h5>
                         <ul class="list">
-                            <li>
-                                @if(!empty($result['commonContent']['setting'][50]->value))
+                            @if(!empty($result['commonContent']['setting'][50]->value))
+                                <li>
                                     <a href="{{$result['commonContent']['setting'][50]->value}}" class="fa fa-facebook" target="_blank"></a>
-                                @endif
-                            </li>
-                            <li>
-                                @if(!empty($result['commonContent']['setting'][52]->value))
+                                </li>
+                            @endif
+                            @if(!empty($result['commonContent']['setting'][52]->value))
+                                <li>
                                     <a href="{{$result['commonContent']['setting'][52]->value}}" class="fa fa-twitter" target="_blank"></a>
-                                @endif</li>
-                            <li>
-                                @if(!empty($result['commonContent']['setting'][51]->value))
-                                    <a href="{{$result['commonContent']['setting'][51]->value}}" class="fa fa-google" target="_blank"></a>
-                                @endif
-                            </li>
-                            <li>
-                                @if(!empty($result['commonContent']['setting'][53]->value))
-                                    <a href="{{$result['commonContent']['setting'][53]->value}}" class="fa fa-linkedin" target="_blank"></a>
-                                @endif
-                            </li>
+                                </li>
+                            @endif
+                            @if(!empty($result['commonContent']['setting'][51]->value))
+                                <li>
+                                    <a href="{{$result['commonContent']['setting'][51]->value}}" class="fa fa-map-marker" target="_blank"></a>
+                                </li>
+                            @endif
+                            @if(!empty($result['commonContent']['setting'][53]->value))
+                                <li>
+                                    <a href="{{$result['commonContent']['setting'][53]->value}}" class="fa fa-instagram" target="_blank"></a>
+                                </li>
+                            @endif
                         </ul>
                     </div>
 
@@ -99,7 +99,11 @@
                 {{--<img class="img-fluid" src="{{asset('').'public/images/payments.png'}}">--}}
             </div>
             <div class="footer-info col-12 col-md-6">
-                <p> © {{date('Y')}} <a href="http://www.ininepal.com.np">Initiative,</a> <a href="#">@lang('website.Privacy')</a> · <a href="#">@lang('website.Terms')</a></p>
+                <p> © {{date('Y')}} <a href="https://www.onlinebonjour.com">Online Bonjour</a>,
+                    Powered By <a href="https://www.ininepal.com.np" target="_blank">INITIATIVE</a>,
+                    <a href="http://onlinebonjour.test/page?name=privacy-policy">@lang('website.Privacy')</a> ·
+                    <a href="http://onlinebonjour.test/page?name=term-services">@lang('website.Terms')</a>
+                </p>
             </div>
             <div class="floating-top"><a href="#" class="fa fa-angle-up"></a></div>
         </div>

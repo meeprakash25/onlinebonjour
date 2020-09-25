@@ -46,32 +46,6 @@
                         
                             {!! Form::open(array('url' =>'admin/updateSetting', 'method'=>'post', 'class' => 'form-horizontal', 'enctype'=>'multipart/form-data')) !!}
                             <br>
-                            
-                            <div class="form-group">
-                              <label for="name" class="col-sm-2 col-md-3 control-label">{{ trans('labels.homeStyle') }}
-                              
-                              </label>
-                              <div class="col-sm-10 col-md-4">
-                              <select name="{{$result['settings'][80]->name}}" class="form-control">
-                              	<option @if($result['settings'][80]->value == 'one')
-                                        selected
-                                    @endif
-                                 value="one"> {{ trans('labels.Style1') }}</option>
-                                <option @if($result['settings'][80]->value == 'two')
-                                        selected
-                                    @endif
-                                 value="two"> {{ trans('labels.Style2') }}</option>
-                              	<option @if($result['settings'][80]->value == 'three')
-                                        selected
-                                    @endif
-                                 value="three"> {{ trans('labels.Style3') }}</option>
-                               </select>
-                                
-                                <span class="help-block" style="font-weight: normal;font-size: 11px;margin-bottom: 0;margin-top: 0;">{{ trans('labels.homeStyleText') }}</span>
-                              </div>
-                            </div>
-                            
-                            
                             <div class="form-group">
                               <label for="name" class="col-sm-2 col-md-3 control-label">{{ trans('labels.Home Colors') }}
                               
@@ -109,7 +83,7 @@
                                 <option @if($result['settings'][81]->value == 'app.theme.7')
                                         selected
                                     @endif
-                                 value="app.theme.7"> {{ trans('labels.White/Red') }}</option>
+                                 value="app.theme.7"> {{ trans('labels.White/Green') }}</option>
                                 <option @if($result['settings'][81]->value == 'app.theme.8')
                                         selected
                                     @endif
@@ -147,7 +121,7 @@
                             <div class="form-group">
                               <label for="name" class="col-sm-2 col-md-3 control-label">{{ trans('labels.website name') }}</label>
                               <div class="col-sm-10 col-md-4">
-                                <input type="text" id="{{$result['settings'][79]->name}}" name="{{$result['settings'][79]->name}}" class="form-control" value="<?=stripslashes($result['settings'][79]->value)?>">
+                                <input type="text" id="{{$result['settings'][79]->name}}" name="{{$result['settings'][79]->name}}" class="form-control" value="{{stripslashes($result['settings'][79]->value)}}">
                                 <span class="help-block" style="font-weight: normal;font-size: 11px;margin-bottom: 0;margin-top: 0;">{{ trans('labels.website name text') }}</span>
                               </div>
                             </div>                           
@@ -179,10 +153,10 @@
                             </div>
                             
                             <div class="form-group">
-                              <label for="name" class="col-sm-2 col-md-3 control-label">{{ trans('labels.linkedLink') }}</label>
+                              <label for="name" class="col-sm-2 col-md-3 control-label">Instagram URL</label>
                               <div class="col-sm-10 col-md-4">
                               		{!! Form::text($result['settings'][53]->name,  $result['settings'][53]->value, array('class'=>'form-control', 'id'=>$result['settings'][53]->name)) !!}
-                                <span class="help-block" style="font-weight: normal;font-size: 11px;margin-bottom: 0;margin-top: 0;">{{ trans('labels.linkedLinkText') }}</span>
+                                <span class="help-block" style="font-weight: normal;font-size: 11px;margin-bottom: 0;margin-top: 0;">Please enter your 'Instagram URL' here</span>
                               </div>
                             </div>
                             
@@ -207,9 +181,7 @@
         </div>
         <!-- /.box --> 
       </div>
-      <!-- /.col --> 
-    </div>
-    <!-- /.row --> 
+      <!-- /.col -->
     
     <!-- Main row --> 
     

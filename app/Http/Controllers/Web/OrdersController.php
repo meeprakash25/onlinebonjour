@@ -851,7 +851,6 @@ class OrdersController extends DataController
 	
 	//orders
 	public function orders(Request $request){
-		
 		$title = array('pageTitle' => Lang::get("website.My Orders"));
 		$result = array();			
 		
@@ -883,7 +882,7 @@ class OrdersController extends DataController
 		}
 				
 		$result['orders'] = $orders;
-		$result['message'] = "Your order has been placed successfully.";
+		//$result['message'] = "Your order has been placed successfully.";
 		return view("orders", $title)->with('result', $result);
 	}
 	
