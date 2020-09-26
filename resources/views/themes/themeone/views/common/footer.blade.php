@@ -99,10 +99,10 @@
                 {{--<img class="img-fluid" src="{{asset('').'public/images/payments.png'}}">--}}
             </div>
             <div class="footer-info col-12 col-md-6">
-                <p> © {{date('Y')}} <a href="https://www.onlinebonjour.com">Online Bonjour</a>,
-                    Powered By <a href="https://www.ininepal.com.np" target="_blank">INITIATIVE</a>,
-                    <a href="http://onlinebonjour.test/page?name=privacy-policy">@lang('website.Privacy')</a> ·
-                    <a href="http://onlinebonjour.test/page?name=term-services">@lang('website.Terms')</a>
+                <p> © {{date('Y')}} <a href="{{url('/')}}">Online Bonjour</a> ·
+                    Powered By <a href="https://www.ininepal.com.np" target="_blank">INITIATIVE</a> ·
+                    <a href="{{url('page?name=privacy-policy')}}">@lang('website.Privacy')</a> ·
+                    <a href="{{url('page?name=term-services')}}">@lang('website.Terms')</a>
                 </p>
             </div>
             <div class="floating-top"><a href="#" class="fa fa-angle-up"></a></div>
