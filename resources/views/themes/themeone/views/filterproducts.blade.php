@@ -42,15 +42,20 @@
                         <div class="price">
                             @if(!empty($products->discount_price))
                                 @if(session('currency') == 'sgd' && session()->has('countryCurrency'))
-                                    {{'S$' .round((($products->products->discount_price) * round((1/session('countryCurrency')),3)),2)}}
-                                    <span>{{'S$' .round((($products->products->products_price) * round((1/session('countryCurrency')),3)),2)}}</span>
+                                    {{'S$' .round((($products->discount_price+0) * round((1/session('countryCurrency')),3)),2)}}
+                                    <span>{{'S$' .round((($products->products_price+0) * round((1/session('countryCurrency')),3)),2)}}</span>
+                                @elseif(session('currency') == 'usd' && session()->has('countryCurrency'))
+                                    {{'USD' .round((($products->discount_price+0) * round((1/session('countryCurrency')),4)),2)}}
+                                    <span>{{'USD' .round((($products->products_price+0) * round((1/session('countryCurrency')),4)),2)}}</span>
                                 @else
                                     {{$web_setting[19]->value}}{{$products->discount_price+0}}
-                                    <span>{{$web_setting[19]->value}}{{$products->products_price+0}}</span>
+                                    <span> {{$web_setting[19]->value}}{{$products->products_price+0}}</span>
                                 @endif
                             @else
                                 @if(session('currency') == 'sgd' && session()->has('countryCurrency'))
-                                    {{'S$' .round((($products->products->products_price) * round((1/session('countryCurrency')),3)),2)}}
+                                    {{'S$' .round((($products->products_price+0) * round((1/session('countryCurrency')),3)),2)}}
+                                @elseif(session('currency') == 'usd' && session()->has('countryCurrency'))
+                                    {{'USD' .round((($products->products_price+0) * round((1/session('countryCurrency')),4)),2)}}
                                 @else
                                     {{$web_setting[19]->value}}{{$products->products_price+0}}
                                 @endif
